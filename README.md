@@ -1,6 +1,6 @@
 # GPT Board
 
-![gpt-board demo](docs/demo.gif)
+![GPT Board demo: sketching a triangle while the AI adds a note](docs/demo/gpt-board-demo.gif)
 
 **Status:** Personal study tool, early stage. Setup is tied to my machine; not ready for other users yet.
 

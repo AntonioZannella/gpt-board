@@ -30,3 +30,7 @@ htmlcov/
 logs/
 .DS_Store
 Thumbs.db
+
+# Demo source recordings and previews (only the GIF is published)
+docs/demo/*.mov
+docs/demo/*-preview.png
