@@ -19,6 +19,7 @@ from urllib.parse import urlsplit, parse_qs, unquote
 import uuid
 from board_storage import ROOT, LOCK, BoardStorage, dumps, secret
 from board_review import ReviewService
+from http_body import BodyError, read_body
 
 
 def finite(value):
@@ -158,22 +159,7 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def body(self):
-        # Accept both fetch Content-Length requests and chunked clients.
-        if self.headers.get('Transfer-Encoding', '').lower() == 'chunked':
-            chunks = []
-            while True:
-                size = int(self.rfile.readline().split(b';', 1)[0], 16)
-                if not size:
-                    while self.rfile.readline() not in (b'\r\n', b'\n', b''):
-                        pass
-                    break
-                chunks.append(self.rfile.read(size))
-                if self.rfile.read(2) != b'\r\n':
-                    raise ValueError('Invalid chunk framing.')
-            data = b''.join(chunks)
-        else:
-            data = self.rfile.read(int(self.headers.get('Content-Length', 0)))
-        return json.loads(data)
+        return json.loads(read_body(self.rfile, self.headers))
 
     def do_GET(self):
         self.handle_request()
@@ -189,6 +175,9 @@ class Handler(BaseHTTPRequestHandler):
             self.route()
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             pass
+        except BodyError as exc:
+            self.close_connection = True
+            self.respond(exc.status, {'error': str(exc)})
         except Exception as exc:
             self.respond(500, {'error': str(exc)})
 

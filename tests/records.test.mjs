@@ -13,7 +13,7 @@ test('read_board saves the frame image; saves log only frames whose ink changed'
 	const root = new URL('../', import.meta.url)
 	const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 	await fs.copyFile(new URL('server.py', root), path.join(tmp, 'server.py'))
-	for(const support of ["board_storage.py", "board_review.py", "mcp_schema.json"]) await fs.copyFile(new URL(support, root),path.join(tmp,support));
+	for(const support of ["board_storage.py", "board_review.py", "http_body.py", "mcp_schema.json"]) await fs.copyFile(new URL(support, root),path.join(tmp,support));
  await fs.writeFile(path.join(tmp, 'package.json'), '{"type":"module"}')
 	await fs.mkdir(path.join(tmp, 'dist'))
 	await fs.writeFile(path.join(tmp, 'dist/index.html'), '<p>Test board</p>')

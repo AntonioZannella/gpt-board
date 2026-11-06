@@ -61,3 +61,23 @@ class HTTPTests(unittest.TestCase):
         for headers in ({'Host': 'evil.example'}, {'Host': 'localhost.evil.example'},
                         {'Host': 'localhost', 'X-Forwarded-For': '1.2.3.4'}):
             self.assertEqual(self.request(self.app.mcp_path, message, headers)[0], 404)
+
+    def test_body_lengths_and_chunks_are_bounded_before_reading(self):
+        from email.message import Message
+        from io import BytesIO
+        import http_body
+        for length in ('-1', 'oops', '+1'):
+            self.assertEqual(self.request('/api/ack', b'', {'Content-Length': length})[0], 400)
+        self.assertEqual(self.request('/api/ack', b'', {'Content-Length': str(http_body.MAX_BODY_BYTES + 1)})[0], 413)
+        with patch.multiple(http_body, MAX_BODY_BYTES=8, MAX_CHUNK_BYTES=6):
+            for data, expected in [(b'7\r\n', 413), (b'5\r\n12345\r\n4\r\n', 413),
+                                   (b'-1\r\n', 400), (b'nope\r\n', 400),
+                                   (b'1\r\naXX', 400), (b'3\r\na', 400)]:
+                headers = Message(); headers['Transfer-Encoding'] = 'chunked'
+                with self.assertRaises(http_body.BodyError) as caught:
+                    http_body.read_body(BytesIO(data), headers)
+                self.assertEqual(caught.exception.status, expected)
+            self.assertEqual(http_body.read_body(BytesIO(b'2\r\n{}\r\n0\r\n\r\n'), headers), b'{}')
+        headers['Content-Length'] = '2'
+        with self.assertRaises(http_body.BodyError):
+            http_body.read_body(BytesIO(b'{}'), headers)

@@ -22,7 +22,7 @@ test('real controller: MCP reviews preserve evidence, record distinct errors, an
     const connection = new AbortController()
     try {
         await fs.copyFile(path.join(root, 'server.py'), path.join(tmp, 'server.py'))
-        for(const support of ["board_storage.py", "board_review.py", "mcp_schema.json"]) await fs.copyFile(new URL(support, new URL('../',import.meta.url)),path.join(tmp,support));
+        for(const support of ["board_storage.py", "board_review.py", "http_body.py", "mcp_schema.json"]) await fs.copyFile(new URL(support, new URL('../',import.meta.url)),path.join(tmp,support));
  await fs.writeFile(path.join(tmp, 'package.json'), '{"type":"module"}')
         await fs.writeFile(errorLog, '# Isolated test error log\n')
         execFileSync(python, [controller, '--dir', courseDir, 'init', '--course', 'Calc 3', '--error-log', errorLog], { stdio: 'pipe' })

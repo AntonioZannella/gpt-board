@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Paired local Wi-Fi bridge for iPad. Never forwards the MCP endpoint."""
 import http.client
+import json
+from http_body import BodyError, read_body
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import os
 import socket
@@ -69,20 +71,7 @@ class Bridge(BaseHTTPRequestHandler):
                 return self.reply(403)
             if not (url.path in ('/', '/index.html', '/native/app.js', '/native/model.js', '/native/style.css', '/api/board', '/api/events', '/api/ack', '/api/notebooks') or url.path.startswith('/assets/')):
                 return self.reply(404)
-            if self.headers.get('Transfer-Encoding', '').lower() == 'chunked':
-                chunks = []
-                while True:
-                    size = int(self.rfile.readline().split(b';', 1)[0], 16)
-                    if size == 0:
-                        while self.rfile.readline() not in (b'\r\n', b'\n', b''):
-                            pass
-                        break
-                    chunks.append(self.rfile.read(size))
-                    if self.rfile.read(2) != b'\r\n':
-                        raise ValueError('Invalid chunk framing.')
-                body = b''.join(chunks)
-            else:
-                body = self.rfile.read(int(self.headers.get('Content-Length', 0)))
+            body = read_body(self.rfile, self.headers)
             excluded = {'host', 'cookie', 'origin', 'referer', 'connection', 'transfer-encoding', 'content-length', 'proxy-connection'}
             headers = {key: value for key, value in self.headers.items() if key.lower() not in excluded}
             headers.update(Host=f'localhost:{config.upstream}', Connection='close')
@@ -104,6 +93,10 @@ class Bridge(BaseHTTPRequestHandler):
                     self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             pass
+        except BodyError as exc:
+            if not sent:
+                self.reply(exc.status, json.dumps({'error': str(exc)}).encode(),
+                           {'Content-Type': 'application/json'})
         except (OSError, ValueError, http.client.HTTPException):
             if not sent:
                 self.reply(502, b'Start the board on your Mac with python3 server.py.')
