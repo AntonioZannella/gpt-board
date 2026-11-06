@@ -128,8 +128,8 @@ class HTTPTests(unittest.TestCase):
             headers = Message(); headers['Content-Length'] = '10'
             client.sendall(b'12')  # then never the rest
             started = time.monotonic()
-            with self.assertRaises(http_body.BodyError) as caught:
-                http_body.read_body(server_side.makefile('rb'), headers, server_side, timeout=.2)
+            with server_side.makefile('rb') as reader, self.assertRaises(http_body.BodyError) as caught:
+                http_body.read_body(reader, headers, server_side, timeout=.2)
             self.assertEqual(caught.exception.status, 408)
             self.assertLess(time.monotonic() - started, 2)
             status, _ = self.request('/api/ack', b'', {'Transfer-Encoding': 'gzip'})
