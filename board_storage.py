@@ -18,6 +18,11 @@ from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parent
 LOCK = threading.RLock()
+MAX_BOARD_BYTES = 48 * 1024 * 1024
+
+
+class BoardSizeError(ValueError):
+    pass
 
 
 def dumps(value):
@@ -237,6 +242,10 @@ class BoardStorage:
 
     def save(self, notebook, snapshot, summary, png=None):
         image = decode_png(png) if png is not None else None
+        snapshot_bytes = dumps(snapshot).encode('utf-8')
+        summary_bytes = dumps(summary).encode('utf-8')
+        if len(snapshot_bytes) + len(summary_bytes) + len(image or b'') > MAX_BOARD_BYTES:
+            raise BoardSizeError('Board save exceeds the 48 MiB limit; existing board was preserved.')
         with LOCK:
             self.require(notebook)
             ink = ink_by_frame(snapshot['store'])
@@ -244,8 +253,8 @@ class BoardStorage:
             if previous is None:
                 previous = ink_by_frame((self.read(notebook) or {}).get('store'))
             # Write before advertising a successful save or activity event.
-            write_json(self.path(notebook, 'board.json'), snapshot)
-            write_json(self.path(notebook, 'summary.json'), summary)
+            atomic_write(self.path(notebook, 'board.json'), snapshot_bytes)
+            atomic_write(self.path(notebook, 'summary.json'), summary_bytes)
             if png:
                 atomic_write(self.path(notebook, 'board.png'), image)
             for frame, fingerprint in ink.items():

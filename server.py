@@ -17,7 +17,7 @@ import sys
 import threading
 from urllib.parse import urlsplit, parse_qs, unquote
 import uuid
-from board_storage import ROOT, LOCK, BoardStorage, dumps, secret, decode_png
+from board_storage import ROOT, LOCK, BoardStorage, dumps, secret, decode_png, BoardSizeError
 from board_review import ReviewService
 from http_body import BodyError, read_body
 
@@ -290,6 +290,8 @@ class Handler(BaseHTTPRequestHandler):
                 if 'changes' in body:
                     try:
                         app.storage.save_changes(notebook, body['changes'], summary)
+                    except BoardSizeError as exc:
+                        return self.respond(413, {'error': str(exc)})
                     except ValueError as exc:
                         return self.respond(400, {'error': str(exc)})
                 else:
@@ -297,6 +299,8 @@ class Handler(BaseHTTPRequestHandler):
                         return self.respond(400, {'error': 'Invalid board save; existing board was preserved.'})
                     try:
                         app.storage.save(notebook, snapshot, summary, png)
+                    except BoardSizeError as exc:
+                        return self.respond(413, {'error': str(exc)})
                     except ValueError as exc:
                         return self.respond(400, {'error': str(exc)})
                 with app.lock:

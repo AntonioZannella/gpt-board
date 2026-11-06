@@ -126,3 +126,22 @@ class HTTPTests(unittest.TestCase):
             self.assertEqual(self.app.storage.read('default'), original)
             with patch.object(self.app, 'send_to_tab', return_value={'ok': True, 'png': png}):
                 self.assertTrue(self.app.call_tool('read_board')['isError'])
+
+    def test_save_limit_preserves_board_for_full_and_incremental_saves(self):
+        from board_storage import dumps
+        original = self.app.storage.read('default')
+        summary = {'shapeCount': 0}
+        size = len(dumps(original).encode()) + len(dumps(summary).encode())
+        body = {'tab': 'test', 'snapshot': original, 'summary': summary}
+        with patch('board_storage.MAX_BOARD_BYTES', size):
+            self.assertEqual(self.request('/api/board', json.dumps(body))[0], 200)
+            before = {p.name: p.read_bytes() for p in self.app.storage.data.glob('*.json')}
+            body['snapshot'] = empty_snapshot('Longer notebook title')
+            self.assertEqual(self.request('/api/board', json.dumps(body))[0], 413)
+            body.pop('snapshot')
+            body['changes'] = {'put': [{'id': 'shape:large', 'typeName': 'shape',
+                                       'type': 'geo', 'props': {'text': 'x' * 100}}], 'remove': []}
+            self.assertEqual(self.request('/api/board', json.dumps(body))[0], 413)
+            after = {p.name: p.read_bytes() for p in self.app.storage.data.glob('*.json')}
+            self.assertEqual(before, after)
+            self.assertEqual(self.app.storage.read('default'), original)
