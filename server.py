@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """GPT Board HTTP, SSE and MCP server. Python standard library only."""
+import argparse
 import base64
+import ipaddress
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import math
@@ -33,6 +35,7 @@ class BoardApp:
         self.review = ReviewService(self.storage)
         self.mcp_path = '/mcp/' + secret(self.storage.data / 'token', 16)
         self.port = int(os.environ.get('PORT', '8787'))
+        self.allowed_hosts = {'localhost', '127.0.0.1'}
         self.tabs, self.pending = {}, {}
         self.active_tab = None
         self.lock = threading.RLock()
@@ -200,7 +203,7 @@ class Handler(BaseHTTPRequestHandler):
             body = self.body()
             result = [r for msg in body if (r := app.rpc(msg)) is not None] if isinstance(body, list) else app.rpc(body)
             return self.respond(202, b'') if result is None or result == [] else self.respond(200, result)
-        remote = self.headers.get('cf-connecting-ip') or self.headers.get('x-forwarded-for') or not re.fullmatch(r'(localhost|127\.0\.0\.1|192\.168\.1\.245)(:\d+)?', self.headers.get('Host', ''))
+        remote = self.headers.get('cf-connecting-ip') or self.headers.get('x-forwarded-for') or not any(re.fullmatch(re.escape(host) + r'(:\d+)?', self.headers.get('Host', '')) for host in app.allowed_hosts)
         if remote:
             return self.respond(404, b'')
         if url.path == '/api/notebooks':
@@ -306,12 +309,38 @@ class Handler(BaseHTTPRequestHandler):
                     self.app.tabs.pop(tab, None)
 
 
+def launch_options(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--port', type=int, default=int(os.environ.get('PORT', '8787')))
+    parser.add_argument('--lan', nargs='?', const='auto', metavar='IPV4',
+                        help='Enable LAN access; optionally specify this Mac’s Wi-Fi IPv4 address.')
+    options = parser.parse_args(argv)
+    if not 1 <= options.port <= 65535:
+        parser.error('--port must be between 1 and 65535')
+    if options.lan:
+        from ipad_server import wifi_host
+        try:
+            address = ipaddress.IPv4Address(wifi_host() if options.lan == 'auto' else options.lan)
+            if address.is_unspecified or address.is_multicast:
+                raise ValueError('Choose a specific interface address')
+            options.lan = str(address)
+        except (OSError, RuntimeError, ValueError) as exc:
+            parser.error(str(exc))
+    return options
+
+
 def main():
+    options = launch_options()
     app = BoardApp()
-    server = ThreadingHTTPServer(('0.0.0.0', app.port), Handler)
+    app.port = options.port
+    if options.lan:
+        app.allowed_hosts.add(options.lan)
+    server = ThreadingHTTPServer(('0.0.0.0' if options.lan else '127.0.0.1', app.port), Handler)
     server.daemon_threads = True
     server.app = app
     print(f'Board: http://localhost:{app.port} (Python)', flush=True)
+    if options.lan:
+        print(f'LAN board: http://{options.lan}:{app.port}', flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
