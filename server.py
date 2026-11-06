@@ -185,8 +185,16 @@ class Handler(BaseHTTPRequestHandler):
         except BodyError as exc:
             self.close_connection = True
             self.respond(exc.status, {'error': str(exc)})
-        except Exception as exc:
-            self.respond(500, {'error': str(exc)})
+        except (json.JSONDecodeError, UnicodeDecodeError, RecursionError):
+            self.close_connection = True
+            if urlsplit(self.path).path == self.app.mcp_path:
+                self.respond(400, {'jsonrpc': '2.0', 'id': None,
+                                   'error': {'code': -32700, 'message': 'Parse error'}})
+            else:
+                self.respond(400, {'error': 'Invalid JSON.'})
+        except Exception:
+            self.close_connection = True
+            self.respond(500, {'error': 'Internal server error.'})
 
     def route(self):
         app = self.app

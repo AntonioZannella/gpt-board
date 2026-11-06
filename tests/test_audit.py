@@ -98,3 +98,12 @@ class HTTPTests(unittest.TestCase):
         self.assertEqual(self.app.pending, {})
         self.assertEqual(messages.qsize(), MAX_PENDING_MESSAGES)
         self.assertEqual(messages.get_nowait(), {'n': 0})
+
+    def test_invalid_json_has_stable_parse_errors_without_exception_details(self):
+        for data in (b'{secret', b'\xff', b'[' * 2000):
+            status, body = self.request(self.app.mcp_path, data)
+            self.assertEqual(status, 400)
+            self.assertEqual(json.loads(body), {'jsonrpc': '2.0', 'id': None,
+                                              'error': {'code': -32700, 'message': 'Parse error'}})
+            status, body = self.request('/api/ack', data)
+            self.assertEqual((status, json.loads(body)), (400, {'error': 'Invalid JSON.'}))
