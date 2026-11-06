@@ -145,3 +145,15 @@ class HTTPTests(unittest.TestCase):
             after = {p.name: p.read_bytes() for p in self.app.storage.data.glob('*.json')}
             self.assertEqual(before, after)
             self.assertEqual(self.app.storage.read('default'), original)
+
+    def test_only_fixed_reasons_reach_clients(self):
+        status, body = self.request('/api/notebooks', json.dumps({'action': 'create', 'name': ''}))
+        self.assertEqual((status, json.loads(body)), (400, {'error': 'Enter a notebook name.'}))
+        with patch.object(self.app.storage, 'create', side_effect=ValueError('/private/path/notebooks.json')):
+            status, body = self.request('/api/notebooks', json.dumps({'action': 'create', 'name': 'x'}))
+        self.assertEqual(status, 500)
+        self.assertNotIn(b'private', body)
+        with patch.object(self.app.review, 'record', side_effect=KeyError('/private/path')):
+            result = self.app.call_tool('record_review', {})
+        self.assertTrue(result['isError'])
+        self.assertNotIn('private', result['content'][0]['text'])

@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 import threading
 import uuid
-from board_storage import ROOT, LOCK, dumps, atomic_write, append_json, stamp, decode_png
+from board_storage import ROOT, LOCK, ClientError, dumps, atomic_write, append_json, stamp, decode_png
 
 REVIEW_LOCK = threading.Lock()
 
@@ -44,41 +44,41 @@ class ReviewService:
 
     def payload(self, args):
         if not isinstance(args, dict):
-            raise ValueError('Provide a structured review.')
+            raise ClientError('Provide a structured review.')
         def nonempty(value):
             return isinstance(value, str) and value.strip() and len(value) <= 12000
         for key in ('check_id', 'course', 'section', 'page', 'problem', 'original_response'):
             if not nonempty(args.get(key)):
-                raise ValueError(f'Provide a nonempty {key} (at most 12000 characters).')
+                raise ClientError(f'Provide a nonempty {key} (at most 12000 characters).')
         if not isinstance(self.courses.get(args['course']), str):
-            raise ValueError('Course is not configured for board reviews.')
+            raise ClientError('Course is not configured for board reviews.')
         if args.get('result') not in ('right', 'wrong', 'partial', 'unresolved'):
-            raise ValueError('Invalid review result.')
+            raise ClientError('Invalid review result.')
         if args.get('read_confidence') not in ('low', 'medium', 'high'):
-            raise ValueError('Invalid read_confidence.')
+            raise ClientError('Invalid read_confidence.')
         if args.get('assistance') not in ('none', 'helped', 'unknown'):
-            raise ValueError('Invalid assistance value.')
+            raise ClientError('Invalid assistance value.')
         errors = args.get('errors')
         if not isinstance(errors, list) or len(errors) > 50:
-            raise ValueError('Provide an errors array with at most 50 entries.')
+            raise ClientError('Provide an errors array with at most 50 entries.')
         if (args['result'] in ('right', 'unresolved')) == bool(errors):
-            raise ValueError('Right/unresolved reviews require no errors; wrong/partial reviews require confirmed errors.')
+            raise ClientError('Right/unresolved reviews require no errors; wrong/partial reviews require confirmed errors.')
         if args['read_confidence'] == 'low' and args['result'] != 'unresolved':
-            raise ValueError('Unclear handwriting must be unresolved, without attributed student errors.')
+            raise ClientError('Unclear handwriting must be unresolved, without attributed student errors.')
         ids = set()
         for error in errors:
             if not isinstance(error, dict):
-                raise ValueError('Each error must be an object.')
+                raise ClientError('Each error must be an object.')
             for key in self.error_fields:
                 if not nonempty(error.get(key)):
-                    raise ValueError(f'Each error requires {key}.')
+                    raise ClientError(f'Each error requires {key}.')
             if error['type'] not in ('WORD', 'TOOL', 'ALGEBRA', 'COPY') or error['confidence'] not in ('low', 'medium', 'high'):
-                raise ValueError('Invalid error type or confidence.')
+                raise ClientError('Invalid error type or confidence.')
             if error['error_id'] in ids:
-                raise ValueError('error_id must be unique within the review.')
+                raise ClientError('error_id must be unique within the review.')
             ids.add(error['error_id'])
         if not re.fullmatch(r'check-[a-f0-9-]{36}', args['check_id']):
-            raise ValueError('Use a check_id returned by an exact-frame read_board call.')
+            raise ClientError('Use a check_id returned by an exact-frame read_board call.')
         index = self.storage.data / 'checks/index.jsonl'
         check = None
         with LOCK:
@@ -91,7 +91,7 @@ class ReviewService:
                                 check = row
                                 break
         if not check or not Path(check['file']).is_file():
-            raise ValueError('Archived check image not found. Read the exact frame again before recording this review.')
+            raise ClientError('Archived check image not found. Read the exact frame again before recording this review.')
         identity = [args[k] for k in ('check_id', 'course', 'section', 'page', 'problem')]
         result = {key: args[key] for key in ('course', 'section', 'page', 'problem', 'original_response', 'result', 'read_confidence', 'assistance', 'errors')}
         result['review_id'] = 'br-' + hashlib.sha256(dumps(identity).encode()).hexdigest()[:32]
@@ -100,7 +100,7 @@ class ReviewService:
             if key in args:
                 result[key] = args[key]
         if len(dumps(result).encode()) > 256 * 1024:
-            raise ValueError('Review is too large; record one problem at a time.')
+            raise ClientError('Review is too large; record one problem at a time.')
         return result
 
     def record(self, args):
@@ -110,19 +110,23 @@ class ReviewService:
             try:
                 child = subprocess.run(command, input=dumps(payload).encode(), stdout=out, stderr=err, timeout=30)
             except subprocess.TimeoutExpired as exc:
-                raise ValueError('Review controller timed out. Logging is not confirmed; retry the same review.') from exc
+                raise ClientError('Review controller timed out. Logging is not confirmed; retry the same review.') from exc
             except OSError as exc:
-                raise ValueError('Review controller could not start: ' + str(exc)) from exc
+                raise ClientError('Review controller could not start. Check MLS_CONTROLLER and MLS_PYTHON.') from exc
             if out.tell() > 1024 * 1024 or err.tell() > 1024 * 1024:
-                raise ValueError('Review controller output exceeded its limit.')
+                raise ClientError('Review controller output exceeded its limit.')
             out.seek(0); err.seek(0)
             stdout, stderr = out.read().decode(), err.read().decode()
         if child.returncode:
-            raise ValueError('Review was not confirmed saved: ' + (stderr.strip() or stdout.strip() or f'controller exited {child.returncode}'))
+            # The controller's own refusal ("Controller busy...", "superseded by...")
+            # tells the AI what to do next; only its last line goes back, capped.
+            lines = (stderr or stdout).strip().splitlines()
+            detail = lines[-1][:300] if lines else f'controller exited {child.returncode}'
+            raise ClientError('Review was not confirmed saved: ' + detail)
         try:
             receipt = json.loads(stdout)
             if receipt['status'] not in ('saved', 'already_saved') or receipt['review_id'] != payload['review_id']:
                 raise ValueError()
         except (ValueError, KeyError, TypeError) as exc:
-            raise ValueError('Review controller returned no valid save confirmation. Retry the same review rather than claiming success.') from exc
+            raise ClientError('Review controller returned no valid save confirmation. Retry the same review rather than claiming success.') from exc
         return receipt

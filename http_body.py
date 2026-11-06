@@ -9,6 +9,7 @@ MAX_LINE_BYTES = 8192
 class BodyError(ValueError):
     def __init__(self, message, status=400):
         super().__init__(message)
+        self.reason = message  # always a fixed sentence, safe to send to the client
         self.status = status
 
 

@@ -17,7 +17,7 @@ import sys
 import threading
 from urllib.parse import urlsplit, parse_qs, unquote
 import uuid
-from board_storage import ROOT, LOCK, BoardStorage, dumps, secret, decode_png, BoardSizeError
+from board_storage import ROOT, LOCK, BoardSizeError, BoardStorage, ClientError, dumps, secret, decode_png
 from board_review import ReviewService
 from http_body import BodyError, read_body
 
@@ -74,8 +74,10 @@ class BoardApp:
         if name == 'record_review':
             try:
                 return text(dumps(self.review.record(args)))
-            except Exception as exc:
-                return text(str(exc), True)
+            except ClientError as exc:
+                return text(exc.reason, True)
+            except Exception:
+                return text('The review failed unexpectedly and was not saved. Retry the same review.', True)
         if name == 'read_board':
             if 'frame' in args and (not isinstance(args['frame'], str) or not args['frame'].strip()):
                 return text('Provide a nonempty frame name.', True)
@@ -202,7 +204,7 @@ class Handler(BaseHTTPRequestHandler):
             pass
         except BodyError as exc:
             self.close_connection = True
-            self.respond(exc.status, {'error': str(exc)})
+            self.respond(exc.status, {'error': exc.reason})
         except (json.JSONDecodeError, UnicodeDecodeError, RecursionError):
             self.close_connection = True
             if urlsplit(self.path).path == self.app.mcp_path:
@@ -242,8 +244,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self.respond(400, {'error': 'Unsupported notebook action.'})
                 try:
                     return self.respond(201, {'notebook': app.storage.create(body.get('name'), body.get('kind', 'notebook'))})
-                except ValueError as exc:
-                    return self.respond(400, {'error': str(exc)})
+                except ClientError as exc:
+                    return self.respond(400, {'error': exc.reason})
         if url.path == '/api/events' and self.command == 'GET':
             return self.events(arg('tab', 'legacy-' + str(uuid.uuid4())), arg('notebook', 'default'))
         if url.path == '/api/ack' and self.command == 'POST':
@@ -268,8 +270,8 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     notebook = app.storage.require(arg('notebook', 'default'))
                     return self.respond(200, app.storage.read(notebook))
-                except ValueError as exc:
-                    return self.respond(404, {'error': str(exc)})
+                except ClientError as exc:
+                    return self.respond(404, {'error': exc.reason})
             if self.command == 'POST':
                 body = self.body()
                 tab = body.get('tab')
@@ -277,8 +279,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self.respond(409, {'error': 'Reload this board tab.'})
                 try:
                     notebook = app.storage.require(body.get('notebook', 'default'))
-                except ValueError as exc:
-                    return self.respond(404, {'error': str(exc)})
+                except ClientError as exc:
+                    return self.respond(404, {'error': exc.reason})
                 snapshot, summary, png = body.get('snapshot'), body.get('summary'), body.get('png')
                 if not isinstance(summary, dict) or not finite(summary.get('shapeCount')) or summary['shapeCount'] < 0 or (png is not None and (not isinstance(png, str) or not png.startswith('data:image/png;base64,'))):
                     return self.respond(400, {'error': 'Invalid board save; existing board was preserved.'})
@@ -290,19 +292,15 @@ class Handler(BaseHTTPRequestHandler):
                 if 'changes' in body:
                     try:
                         app.storage.save_changes(notebook, body['changes'], summary)
-                    except BoardSizeError as exc:
-                        return self.respond(413, {'error': str(exc)})
-                    except ValueError as exc:
-                        return self.respond(400, {'error': str(exc)})
+                    except ClientError as exc:
+                        return self.respond(413 if isinstance(exc, BoardSizeError) else 400, {'error': exc.reason})
                 else:
                     if not isinstance(snapshot, dict) or not isinstance(snapshot.get('store'), dict) or not snapshot.get('schema'):
                         return self.respond(400, {'error': 'Invalid board save; existing board was preserved.'})
                     try:
                         app.storage.save(notebook, snapshot, summary, png)
-                    except BoardSizeError as exc:
-                        return self.respond(413, {'error': str(exc)})
-                    except ValueError as exc:
-                        return self.respond(400, {'error': str(exc)})
+                    except ClientError as exc:
+                        return self.respond(413 if isinstance(exc, BoardSizeError) else 400, {'error': exc.reason})
                 with app.lock:
                     app.active_tab = tab
                     if tab in app.tabs:

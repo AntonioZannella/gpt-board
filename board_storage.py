@@ -21,7 +21,16 @@ LOCK = threading.RLock()
 MAX_BOARD_BYTES = 48 * 1024 * 1024
 
 
-class BoardSizeError(ValueError):
+class ClientError(ValueError):
+    """A request the server refuses. `reason` is a fixed sentence, safe to
+    send back to the browser or MCP client (no paths or library details)."""
+
+    def __init__(self, reason):
+        super().__init__(reason)
+        self.reason = reason
+
+
+class BoardSizeError(ClientError):
     pass
 
 
@@ -176,13 +185,13 @@ class BoardStorage:
 
     def require(self, notebook):
         if not isinstance(notebook, str) or not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,63}', notebook) or not any(b['id'] == notebook for b in self.metadata()['notebooks']):
-            raise ValueError('Notebook not found.')
+            raise ClientError('Notebook not found.')
         return notebook
 
     def path(self, notebook, name):
         # IDs must also be safe for callers preparing a new notebook before registering it.
         if not isinstance(notebook, str) or not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,63}', notebook):
-            raise ValueError('Invalid notebook ID.')
+            raise ClientError('Invalid notebook ID.')
         return (self.data if notebook == 'default' else self.data / 'notebooks' / notebook) / name
 
     def read(self, notebook, name='board.json', fallback=None):
@@ -190,10 +199,10 @@ class BoardStorage:
 
     def create(self, name, kind='notebook'):
         if kind not in ('notebook', 'whiteboard'):
-            raise ValueError('Invalid collection type.')
+            raise ClientError('Invalid collection type.')
         name = str(name or '').strip()[:80]
         if not name:
-            raise ValueError('Enter a notebook name.')
+            raise ClientError('Enter a notebook name.')
         with LOCK:
             meta = self.metadata()
             base = re.sub('[^a-z0-9]+', '-', unicodedata.normalize('NFKD', name.lower())).strip('-')[:48] or 'notebook'
@@ -204,7 +213,7 @@ class BoardStorage:
             source = self.read('default') or (empty_snapshot(name) if kind == 'whiteboard' else None)
             snapshot = blank_snapshot(source, name)
             if not snapshot['schema'] or not snapshot['store']:
-                raise ValueError('The current notebook cannot be used as a template.')
+                raise ClientError('The current notebook cannot be used as a template.')
             write_json(self.path(notebook, 'board.json'), snapshot)
             item = {'id': notebook, 'name': name, 'kind': kind}
             meta['notebooks'].append(item)
@@ -214,26 +223,26 @@ class BoardStorage:
     def save_changes(self, notebook, changes, summary):
         """Merge browser shape edits in Python, keeping PDF assets off the input thread."""
         if not isinstance(changes, dict) or set(changes) != {'put', 'remove'}:
-            raise ValueError('Invalid shape changes')
+            raise ClientError('Invalid shape changes')
         put, remove = changes['put'], changes['remove']
         if not isinstance(put, list) or not isinstance(remove, list):
-            raise ValueError('Invalid shape changes')
+            raise ClientError('Invalid shape changes')
         if any(not isinstance(s, dict) or s.get('typeName') != 'shape' or
                not isinstance(s.get('id'), str) or not s['id'].startswith('shape:') or
                not isinstance(s.get('props'), dict) for s in put):
-            raise ValueError('Only shape records may be updated')
+            raise ClientError('Only shape records may be updated')
         if any(not isinstance(key, str) or not key.startswith('shape:') for key in remove):
-            raise ValueError('Only shape records may be removed')
+            raise ClientError('Only shape records may be removed')
         with LOCK:
             snapshot = self.read(self.require(notebook))
             if not snapshot or not isinstance(snapshot.get('store'), dict):
-                raise ValueError('Notebook unavailable')
+                raise ClientError('Notebook unavailable')
             records = snapshot['store']
             ids = [s['id'] for s in put] + remove
             if len(ids) != len(set(ids)):
-                raise ValueError('Duplicate shape changes')
+                raise ClientError('Duplicate shape changes')
             if any(key in records and records[key].get('typeName') != 'shape' for key in ids):
-                raise ValueError('Cannot replace non-shape records')
+                raise ClientError('Cannot replace non-shape records')
             for key in remove:
                 records.pop(key, None)
             for shape in put:

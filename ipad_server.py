@@ -95,7 +95,7 @@ class Bridge(BaseHTTPRequestHandler):
             pass
         except BodyError as exc:
             if not sent:
-                self.reply(exc.status, json.dumps({'error': str(exc)}).encode(),
+                self.reply(exc.status, json.dumps({'error': exc.reason}).encode(),
                            {'Content-Type': 'application/json'})
         except (OSError, ValueError, http.client.HTTPException):
             if not sent:
