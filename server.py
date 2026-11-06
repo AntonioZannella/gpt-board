@@ -48,6 +48,16 @@ def finite(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
+def check_png(value):
+    # One PNG check for every route: a missing image is fine, anything else
+    # must be a valid PNG data URL or the request gets a 400.
+    if value is not None:
+        try:
+            decode_png(value)
+        except ValueError:
+            raise BodyError('Invalid PNG image.') from None
+
+
 def text(value, error=False):
     return {'content': [{'type': 'text', 'text': value}], 'isError': error}
 
@@ -282,7 +292,11 @@ class Handler(BaseHTTPRequestHandler):
                 except ClientError as exc:
                     return self.respond(400, {'error': exc.reason})
         if url.path == '/api/events' and self.command == 'GET':
-            return self.events(arg('tab', 'legacy-' + str(uuid.uuid4())), arg('notebook', 'default'))
+            try:
+                notebook = app.storage.require(arg('notebook', 'default'))
+            except ClientError as exc:
+                return self.respond(404, {'error': exc.reason})
+            return self.events(arg('tab', 'legacy-' + str(uuid.uuid4())), notebook)
         if url.path == '/api/ack' and self.command == 'POST':
             body = self.body()
             op_id = body.pop('opId', None)
@@ -290,11 +304,7 @@ class Handler(BaseHTTPRequestHandler):
                 raise BodyError('Provide a valid operation ID.')
             if 'summary' in body and not isinstance(body['summary'], dict):
                 raise BodyError('Invalid board summary.')
-            if body.get('png') is not None:
-                try:
-                    decode_png(body['png'])
-                except ValueError:
-                    raise BodyError('Invalid PNG image.') from None
+            check_png(body.get('png'))
             with app.lock:
                 target = app.pending.pop(op_id, None)
                 if target:
@@ -317,13 +327,9 @@ class Handler(BaseHTTPRequestHandler):
                 except ClientError as exc:
                     return self.respond(404, {'error': exc.reason})
                 snapshot, summary, png = body.get('snapshot'), body.get('summary'), body.get('png')
-                if not isinstance(summary, dict) or not finite(summary.get('shapeCount')) or summary['shapeCount'] < 0 or (png is not None and (not isinstance(png, str) or not png.startswith('data:image/png;base64,'))):
+                if not isinstance(summary, dict) or not finite(summary.get('shapeCount')) or summary['shapeCount'] < 0:
                     return self.respond(400, {'error': 'Invalid board save; existing board was preserved.'})
-                if png is not None:
-                    try:
-                        decode_png(png)
-                    except ValueError:
-                        raise BodyError('Invalid PNG image.') from None
+                check_png(png)
                 if 'changes' in body:
                     try:
                         app.storage.save_changes(notebook, body['changes'], summary)

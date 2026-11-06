@@ -53,6 +53,21 @@ class HTTPTests(unittest.TestCase):
         finally:
             conn.close()
 
+    def test_events_and_board_validate_notebook_and_png_alike(self):
+        conn = http.client.HTTPConnection('127.0.0.1', self.server.server_port, timeout=3)
+        for notebook in ('../x', 'Missing', '%5B%5D'):
+            conn.request('GET', '/api/events?tab=bad-notebook&notebook=' + notebook)
+            response = conn.getresponse()
+            self.assertEqual(response.status, 404)
+            response.read()
+        conn.close()
+        self.assertNotIn('bad-notebook', self.app.tabs)
+        for png in (5, [], {}, True, '', 'data:image/png;base64,'):
+            board = {'tab': 't', 'snapshot': empty_snapshot('F'), 'summary': {'shapeCount': 0}, 'png': png}
+            for path, body in (('/api/board', board), ('/api/ack', {'opId': 'x', 'png': png})):
+                status, data = self.request(path, json.dumps(body))
+                self.assertEqual((status, json.loads(data)), (400, {'error': 'Invalid PNG image.'}))
+
     def test_initialize_negotiates_the_protocol_version(self):
         import server
         def negotiated(params):
