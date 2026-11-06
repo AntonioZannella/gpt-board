@@ -19,6 +19,18 @@ This is a working personal installation being prepared for a local-first beta. P
 - **MCP client:** a connected AI client requests board images or calls drawing tools through the server. Reading and drawing require an open board tab. Review recording also depends on a separately configured Math Learning System.
 - **Optional iPad bridge:** a paired Python Wi-Fi proxy connects an iPad browser to the same board server. It forwards the board routes and event stream, but does not expose the MCP endpoint.
 
+## MCP tools
+
+These are the tools declared in `mcp_schema.json` and handled by the Python server:
+
+| Tool | What it does |
+| --- | --- |
+| `read_board` | Returns a fresh image of an exact page frame, lists frames when no frame is supplied, or reads an explicit whole-board overview. |
+| `add_shapes` | Adds shapes, text, sticky notes or arrows, with optional automatic placement. |
+| `update_shapes` | Moves, resizes, recolors or edits existing shapes by ID, changing only the supplied fields. |
+| `delete_shapes` | Deletes shapes by ID; tool instructions restrict deletion to AI-created shapes unless the user asks otherwise. |
+| `record_review` | Saves one checked problem, including correct or unresolved results, with fresh exact-frame evidence to the configured Math Learning System and error log. |
+
 ## Using the existing installation
 
 Open <http://localhost:8787> on the computer running GPT Board. On the iPad, use your existing paired board address. Existing launch commands are listed below; if the services are already running, keep using them without launching another copy.
