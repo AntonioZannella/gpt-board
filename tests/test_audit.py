@@ -107,3 +107,22 @@ class HTTPTests(unittest.TestCase):
                                               'error': {'code': -32700, 'message': 'Parse error'}})
             status, body = self.request('/api/ack', data)
             self.assertEqual((status, json.loads(body)), (400, {'error': 'Invalid JSON.'}))
+
+    def test_non_objects_bad_rpc_params_and_png_fail_without_writing(self):
+        for body in ([], ['x'], None, 'text', 4):
+            for path in ('/api/board', '/api/ack', '/api/notebooks'):
+                self.assertEqual(self.request(path, json.dumps(body))[0], 400)
+        for body in (None, 'text', 4, []):
+            status, data = self.request(self.app.mcp_path, json.dumps(body))
+            self.assertEqual(json.loads(data)['error']['code'], -32600)
+        for params in ([], 'x', 1):
+            result = self.app.rpc({'jsonrpc': '2.0', 'id': 1, 'method': 'tools/call', 'params': params})
+            self.assertEqual(result['error']['code'], -32602)
+        original = self.app.storage.read('default')
+        for png in ('no comma', 'data:image/png;base64,???', 'data:image/png;base64,aGVsbG8=', 5):
+            body = {'tab': 'test', 'snapshot': empty_snapshot('Changed'),
+                    'summary': {'shapeCount': 0}, 'png': png}
+            self.assertEqual(self.request('/api/board', json.dumps(body))[0], 400)
+            self.assertEqual(self.app.storage.read('default'), original)
+            with patch.object(self.app, 'send_to_tab', return_value={'ok': True, 'png': png}):
+                self.assertTrue(self.app.call_tool('read_board')['isError'])

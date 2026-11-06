@@ -1,6 +1,10 @@
 """Persistent notebook records shared by the HTTP server and local utilities."""
 from __future__ import annotations
+import base64
+import binascii
 import copy
+import struct
+import zlib
 import hashlib
 import json
 import os
@@ -19,6 +23,44 @@ LOCK = threading.RLock()
 def dumps(value):
     # Compact UTF-8 matches JSON.stringify for review identity and record fingerprints.
     return json.dumps(value, ensure_ascii=False, separators=(',', ':'), allow_nan=False)
+
+
+def decode_png(value):
+    """Validate the data URL and PNG chunk framing before writing any files."""
+    error = 'Invalid PNG image.'
+    if not isinstance(value, str) or not value.startswith('data:image/png;base64,'):
+        raise ValueError(error)
+    try:
+        image = base64.b64decode(value.split(',', 1)[1], validate=True)
+    except (ValueError, binascii.Error):
+        raise ValueError(error) from None
+    if not image.startswith(b'\x89PNG\r\n\x1a\n'):
+        raise ValueError(error)
+    offset, seen_header, seen_data = 8, False, False
+    while offset + 12 <= len(image):
+        size = int.from_bytes(image[offset:offset + 4], 'big')
+        end = offset + 12 + size
+        if end > len(image):
+            raise ValueError(error)
+        kind = image[offset + 4:offset + 8]
+        data = image[offset + 8:end - 4]
+        checksum = int.from_bytes(image[end - 4:end], 'big')
+        if zlib.crc32(kind + data) != checksum:
+            raise ValueError(error)
+        if not seen_header:
+            if kind != b'IHDR' or size != 13 or 0 in struct.unpack('>II', data[:8]):
+                raise ValueError(error)
+            seen_header = True
+        elif kind == b'IHDR':
+            raise ValueError(error)
+        if kind == b'IDAT':
+            seen_data = True
+        if kind == b'IEND':
+            if size or end != len(image) or not seen_data:
+                raise ValueError(error)
+            return image
+        offset = end
+    raise ValueError(error)
 
 
 def read_json(path, fallback=None):
@@ -194,7 +236,7 @@ class BoardStorage:
             self.save(notebook, snapshot, summary)
 
     def save(self, notebook, snapshot, summary, png=None):
-        import base64
+        image = decode_png(png) if png is not None else None
         with LOCK:
             self.require(notebook)
             ink = ink_by_frame(snapshot['store'])
@@ -205,7 +247,7 @@ class BoardStorage:
             write_json(self.path(notebook, 'board.json'), snapshot)
             write_json(self.path(notebook, 'summary.json'), summary)
             if png:
-                atomic_write(self.path(notebook, 'board.png'), base64.b64decode(png.split(',', 1)[1]))
+                atomic_write(self.path(notebook, 'board.png'), image)
             for frame, fingerprint in ink.items():
                 if fingerprint != previous.get(frame):
                     append_json(self.data / 'activity.jsonl', {**stamp(), 'notebook': notebook, 'frame': frame})

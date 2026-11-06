@@ -1,5 +1,4 @@
 """Archived board evidence and the canonical Math Learning System CLI bridge."""
-import base64
 import hashlib
 import json
 import os
@@ -9,7 +8,7 @@ import subprocess
 import tempfile
 import threading
 import uuid
-from board_storage import ROOT, LOCK, dumps, atomic_write, append_json, stamp
+from board_storage import ROOT, LOCK, dumps, atomic_write, append_json, stamp, decode_png
 
 REVIEW_LOCK = threading.Lock()
 
@@ -33,7 +32,7 @@ class ReviewService:
         check_id = 'check-' + str(uuid.uuid4())
         name = re.sub(r'[^\w.-]+', '_', frame, flags=re.ASCII) + '-' + re.sub(r'[:.]', '', when['ts'][11:23]) + '-' + check_id[-8:] + '.png'
         path = self.storage.data / 'checks' / when['ts'][:10] / name
-        image = base64.b64decode(png.split(',', 1)[1])
+        image = decode_png(png)
         row = {**when, 'check_id': check_id, 'notebook': notebook, 'frame': frame,
                'file': str(path), 'sha256': hashlib.sha256(image).hexdigest()}
         if region:

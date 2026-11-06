@@ -59,7 +59,7 @@ test('read_board saves the frame image; saves log only frames whose ink changed'
 					const ev = buf.slice(0, end); buf = buf.slice(end + 2)
 					if (!ev.startsWith('data: ')) continue
 					const msg = JSON.parse(ev.slice(6))
-					await post(base + '/api/ack', { opId: msg.opId, ok: true, summary: { frame: msg.frame }, png: 'data:image/png;base64,aGVsbG8=' })
+					await post(base + '/api/ack', { opId: msg.opId, ok: true, summary: { frame: msg.frame }, png: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=' })
 				}
 			}
 		})().catch(() => {})
@@ -70,7 +70,7 @@ test('read_board saves the frame image; saves log only frames whose ink changed'
 		const index = (await fs.readFile(path.join(tmp, 'data/checks/index.jsonl'), 'utf8')).trim().split('\n').map(JSON.parse)
 		assert.equal(index.length, 1)
 		assert.equal(index[0].frame, '13.8-B P1')
-		assert.equal((await fs.readFile(index[0].file)).toString(), 'hello', 'the saved image is the one the tutor got')
+		assert.equal((await fs.readFile(index[0].file)).toString('base64'), 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=', 'the saved image is the one the tutor got')
 		assert.ok(path.basename(index[0].file).startsWith('13.8-B_P1-'))
 		await rpc({ overview: true })
 		assert.equal((await fs.readFile(path.join(tmp, 'data/checks/index.jsonl'), 'utf8')).trim().split('\n').length, 1, 'overviews are not saved as check images')

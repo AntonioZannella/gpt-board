@@ -17,7 +17,7 @@ import sys
 import threading
 from urllib.parse import urlsplit, parse_qs, unquote
 import uuid
-from board_storage import ROOT, LOCK, BoardStorage, dumps, secret
+from board_storage import ROOT, LOCK, BoardStorage, dumps, secret, decode_png
 from board_review import ReviewService
 from http_body import BodyError, read_body
 
@@ -90,10 +90,17 @@ class BoardApp:
             if not result.get('ok'):
                 return text(result.get('error', 'Board operation failed.'), True)
             summary = result.get('summary') or {}
+            if not isinstance(summary, dict):
+                return text('Invalid board summary.', True)
             if 'region' in args and not valid_region(summary.get('region')):
                 return text('Refresh the GPT Board tab to enable close-up reads. This tab did not confirm the requested slice, so no cropped review evidence was archived.', True)
             content = []
             png = result.get('png')
+            if png is not None:
+                try:
+                    decode_png(png)
+                except ValueError:
+                    return text('Invalid PNG image from board tab.', True)
             if png:
                 content.append({'type': 'image', 'data': png.split(',', 1)[1], 'mimeType': 'image/png'})
             summary = {**summary, 'review_instructions': self.review.instructions}
@@ -122,6 +129,14 @@ class BoardApp:
         return text(f'Unknown tool: {name}', True)
 
     def rpc(self, message):
+        if (not isinstance(message, dict) or message.get('jsonrpc') != '2.0'
+                or not isinstance(message.get('method'), str)
+                or isinstance(message.get('id'), (dict, list, bool, float))):
+            return {'jsonrpc': '2.0', 'id': None,
+                    'error': {'code': -32600, 'message': 'Invalid Request'}}
+        if 'params' in message and not isinstance(message['params'], dict):
+            return {'jsonrpc': '2.0', 'id': message.get('id'),
+                    'error': {'code': -32602, 'message': 'Invalid params'}}
         if 'id' not in message:
             return None
         method, params = message.get('method'), message.get('params') or {}
@@ -165,8 +180,11 @@ class Handler(BaseHTTPRequestHandler):
         if self.command != 'HEAD':
             self.wfile.write(body)
 
-    def body(self):
-        return json.loads(read_body(self.rfile, self.headers))
+    def body(self, object_only=True):
+        value = json.loads(read_body(self.rfile, self.headers))
+        if object_only and not isinstance(value, dict):
+            raise BodyError('JSON body must be an object.')
+        return value
 
     def do_GET(self):
         self.handle_request()
@@ -207,7 +225,9 @@ class Handler(BaseHTTPRequestHandler):
         if url.path == app.mcp_path:
             if self.command != 'POST':
                 return self.respond(405, b'', headers={'Allow': 'POST'})
-            body = self.body()
+            body = self.body(object_only=False)
+            if body == []:
+                return self.respond(200, app.rpc(None))
             result = [r for msg in body if (r := app.rpc(msg)) is not None] if isinstance(body, list) else app.rpc(body)
             return self.respond(202, b'') if result is None or result == [] else self.respond(200, result)
         if url.path == '/api/notebooks':
@@ -229,6 +249,15 @@ class Handler(BaseHTTPRequestHandler):
         if url.path == '/api/ack' and self.command == 'POST':
             body = self.body()
             op_id = body.pop('opId', None)
+            if not isinstance(op_id, str) or not op_id:
+                raise BodyError('Provide a valid operation ID.')
+            if 'summary' in body and not isinstance(body['summary'], dict):
+                raise BodyError('Invalid board summary.')
+            if body.get('png') is not None:
+                try:
+                    decode_png(body['png'])
+                except ValueError:
+                    raise BodyError('Invalid PNG image.') from None
             with app.lock:
                 target = app.pending.pop(op_id, None)
                 if target:
@@ -253,6 +282,11 @@ class Handler(BaseHTTPRequestHandler):
                 snapshot, summary, png = body.get('snapshot'), body.get('summary'), body.get('png')
                 if not isinstance(summary, dict) or not finite(summary.get('shapeCount')) or summary['shapeCount'] < 0 or (png is not None and (not isinstance(png, str) or not png.startswith('data:image/png;base64,'))):
                     return self.respond(400, {'error': 'Invalid board save; existing board was preserved.'})
+                if png is not None:
+                    try:
+                        decode_png(png)
+                    except ValueError:
+                        raise BodyError('Invalid PNG image.') from None
                 if 'changes' in body:
                     try:
                         app.storage.save_changes(notebook, body['changes'], summary)
@@ -261,7 +295,10 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     if not isinstance(snapshot, dict) or not isinstance(snapshot.get('store'), dict) or not snapshot.get('schema'):
                         return self.respond(400, {'error': 'Invalid board save; existing board was preserved.'})
-                    app.storage.save(notebook, snapshot, summary, png)
+                    try:
+                        app.storage.save(notebook, snapshot, summary, png)
+                    except ValueError as exc:
+                        return self.respond(400, {'error': str(exc)})
                 with app.lock:
                     app.active_tab = tab
                     if tab in app.tabs:

@@ -52,7 +52,7 @@ class StorageTests(unittest.TestCase):
 
     def test_review_identity_matches_existing_javascript_receipts(self):
         service = ReviewService(self.storage)
-        image = 'data:image/png;base64,aGVsbG8='
+        image = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII='
         check = service.archive('Test page', image, 'default', {'top': 0, 'height': 200})
         args = {'check_id': check['check_id'], 'course': 'Calc 3', 'section': '13.8', 'page': '7', 'problem': 'é1', 'original_response': 'Unclear synthetic sample', 'result': 'unresolved', 'read_confidence': 'low', 'assistance': 'unknown', 'errors': []}
         payload = service.payload(args)
@@ -60,7 +60,7 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(payload['review_id'], 'br-' + hashlib.sha256(expected.encode()).hexdigest()[:32])
         self.assertEqual(payload['evidence']['image'], check['file'])
         self.assertEqual(service.payload(args), payload)
-        self.assertEqual(Path(check['file']).read_bytes(), b'hello')
+        self.assertEqual(Path(check['file']).read_bytes(), __import__('base64').b64decode(image.split(',')[1]))
 
     def test_session_loader_backs_up_and_rejects_bad_sessions(self):
         sessions = self.root / 'sessions'; sessions.mkdir()

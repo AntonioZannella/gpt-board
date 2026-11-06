@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const controller = process.env.MLS_TEST_CONTROLLER || path.resolve(root, '../Math Learning System/mls.py')
 const python = process.env.MLS_TEST_PYTHON || 'python3'
-const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='
+const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII='
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 test('real controller: MCP reviews preserve evidence, record distinct errors, and retry idempotently', async () => {

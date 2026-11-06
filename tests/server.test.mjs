@@ -41,13 +41,13 @@ test('isolated HTTP, persistence, MCP routing and iPad access',async()=>{
  for(const name of ['first','second']){
   const controller=new AbortController();controllers.push(controller);
   const res=await fetch(base+'/api/events?tab='+name,{signal:controller.signal});
-  (async()=>{let buffer='';for await(const chunk of res.body){buffer+=new TextDecoder().decode(chunk);let end;while((end=buffer.indexOf('\n\n'))>=0){const event=buffer.slice(0,end);buffer=buffer.slice(end+2);if(!event.startsWith('data: '))continue;const msg=JSON.parse(event.slice(6));received[name].push(msg);await post(base+'/api/ack',{opId:msg.opId,ok:true,ids:[],summary:msg.frame?{frame:'Test'}:{frames:['Test']},...((msg.frame||msg.overview)&&{png:'data:image/png;base64,aGVsbG8='})})}}})().catch(()=>{});
+  (async()=>{let buffer='';for await(const chunk of res.body){buffer+=new TextDecoder().decode(chunk);let end;while((end=buffer.indexOf('\n\n'))>=0){const event=buffer.slice(0,end);buffer=buffer.slice(end+2);if(!event.startsWith('data: '))continue;const msg=JSON.parse(event.slice(6));received[name].push(msg);await post(base+'/api/ack',{opId:msg.opId,ok:true,ids:[],summary:msg.frame?{frame:'Test'}:{frames:['Test']},...((msg.frame||msg.overview)&&{png:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII='})})}}})().catch(()=>{});
  }
  const token=(await fs.readFile(path.join(tmp,'data/token'),'utf8')).trim();
  const rpc=async(name,args={})=>(await (await post(base+'/mcp/'+token,{jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:args}})).json()).result;
  await rpc('read_board',{frame:'Test'});assert.equal(received.first.length,1);assert.equal(received.second.length,0,'startup requests must reach just one tab');
  await save('second');for(const name of ['add_shapes','update_shapes','delete_shapes'])await rpc(name,{shapes:[],ids:[]});assert.equal(received.first.length,1);assert.equal(received.second.length,3,'active tab should receive all tools');
- await save('second',{png:'data:image/png;base64,aGVsbG8=',summary:{shapeCount:1,imageStale:true}});
+ await save('second',{png:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=',summary:{shapeCount:1,imageStale:true}});
  const listing=await rpc('read_board');assert.ok(!listing.content.some(c=>c.type==='image'),'frame listing must not export an image');assert.ok(listing.content[0].text.includes('Test'));const overview=await rpc('read_board',{overview:true});assert.equal(overview.content[0].type,'image');const bad=await rpc('read_board',{frame:5});assert.ok(bad.isError);
  await start('ipad_server.py',{IPAD_HOST:'127.0.0.1',IPAD_PORT:'8794',BOARD_PORT:'8793'});
  const ipad='http://127.0.0.1:8794';assert.equal((await fetch(ipad)).status,403);
