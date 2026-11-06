@@ -31,6 +31,12 @@ These are the tools declared in `mcp_schema.json` and handled by the Python serv
 | `delete_shapes` | Deletes shapes by ID; tool instructions restrict deletion to AI-created shapes unless the user asks otherwise. |
 | `record_review` | Saves one checked problem, including correct or unresolved results, with fresh exact-frame evidence to the configured Math Learning System and error log. |
 
+## Trade-offs
+
+- **Standard library only:** nothing to install beyond Python to run the backend, and I wanted to learn Python itself rather than a framework. Browser drawing and input stay in JavaScript.
+- **SSE over WebSockets:** the server only needs to push edits one way to the board tab; the tab sends its responses over HTTP. SSE runs over plain HTTP, the browser reconnects on its own, and Python's standard library has no WebSocket support.
+- **MCP:** it is a standard protocol, so compatible AI clients, such as Codex or Claude, can read and draw on the board through the same tools without custom board code for each client. Each client still needs an MCP connection configured for this server.
+
 ## Using the existing installation
 
 Open <http://localhost:8787> on the computer running GPT Board. On the iPad, use your existing paired board address. Existing launch commands are listed below; if the services are already running, keep using them without launching another copy.
