@@ -1,5 +1,7 @@
 # GPT Board
 
+[![CI](https://github.com/AntonioZannella/gpt-board/actions/workflows/ci.yml/badge.svg)](https://github.com/AntonioZannella/gpt-board/actions/workflows/ci.yml)
+
 ![GPT Board demo: sketching a triangle while the AI adds a note](docs/demo/gpt-board-demo.gif)
 
 **Status:** Personal study tool, early stage. Setup is tied to my machine; not ready for other users yet.
@@ -67,6 +69,7 @@ The frontend is our own Canvas 2D engine. It has no tldraw, React, Vite, or othe
 - `SHOW_PAIRING_LINK=1 python3 ipad_server.py`: prints the private pairing URL when starting the bridge. Keep that URL private. Existing paired devices retain their cookie and token.
 - `python3 load_session.py 1`: loads an existing prebuilt session after backing up the previous default board. Close board tabs first, then reopen them. This utility does not start a tutoring-controller session.
 - `python3 -m unittest discover -s tests -p 'test_*.py' -v`: Python backend tests.
+- GitHub Actions (`.github/workflows/ci.yml`) runs `ruff check` and these Python backend tests on every push and pull request.
 - `python3 test.py`: all Python tests plus the JavaScript drawing/client contract checks (Node needed only for those checks).
 
 ### Full-suite test prerequisite
