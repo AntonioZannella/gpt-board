@@ -1,5 +1,7 @@
 # GPT Board
 
+![gpt-board demo](docs/demo.gif)
+
 **Status:** Personal study tool, early stage. Setup is tied to my machine; not ready for other users yet.
 
 GPT Board is a personal handwriting workspace with saved notebooks, infinite whiteboards, and an MCP connection that lets an AI assistant read and work with the board.
