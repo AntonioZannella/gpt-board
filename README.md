@@ -10,13 +10,21 @@ GPT Board is a personal handwriting workspace with saved notebooks, infinite whi
 
 `server.js`, `ipad-server.js` and `load-session.js` are compatibility launchers: each one only starts the matching Python program.
 
-Built with AI assistance; designed and maintained by the project author.
-
-The JavaScript frontend was built with AI assistance.
+I design the features and test them, using AI coding tools for implementation. I am learning the Python backend line by line as I maintain it; browser drawing and input run in JavaScript.
 
 ## Current status
 
 This is a working personal installation being prepared for a local-first beta. Public installation, cross-platform support, and multi-user hosting are not ready yet. The current setup includes a personal Math Learning System integration; copying this repository alone does not reproduce that setup or include its notebooks.
+
+## Project history
+
+The public repository starts with a snapshot committed on November 5, 2026. The project already existed before that snapshot, so this history does not show every earlier implementation step. References to existing notebooks and the previous frontend describe that earlier personal installation.
+
+## Active-tab routing
+
+The Python server prefers the tab that saved most recently. If that tab is not connected, it falls back to another registered tab; it does not guarantee delivery only to the last-saving tab. Tabs using the legacy connection identifier are excluded from the operation registry, and saves without a tab identifier receive HTTP 409 with a reload message.
+
+This behavior is visible in the [initial public server snapshot](https://github.com/AntonioZannella/gpt-board/blob/57b0dcf884c89ec0c9f10b080f78fe815e848f38/server.py), in `BoardApp.send_to_tab`, the save handler, and the event-stream registration. The public history does not isolate the original fix as a separate commit.
 
 ## Architecture
 
