@@ -197,15 +197,15 @@ class Handler(BaseHTTPRequestHandler):
         url = urlsplit(self.path)
         query = parse_qs(url.query)
         arg = lambda key, default=None: query.get(key, [default])[0]
+        remote = self.headers.get('cf-connecting-ip') or self.headers.get('x-forwarded-for') or not any(re.fullmatch(re.escape(host) + r'(:\d+)?', self.headers.get('Host', '')) for host in app.allowed_hosts)
+        if remote:
+            return self.respond(404, b'')
         if url.path == app.mcp_path:
             if self.command != 'POST':
                 return self.respond(405, b'', headers={'Allow': 'POST'})
             body = self.body()
             result = [r for msg in body if (r := app.rpc(msg)) is not None] if isinstance(body, list) else app.rpc(body)
             return self.respond(202, b'') if result is None or result == [] else self.respond(200, result)
-        remote = self.headers.get('cf-connecting-ip') or self.headers.get('x-forwarded-for') or not any(re.fullmatch(re.escape(host) + r'(:\d+)?', self.headers.get('Host', '')) for host in app.allowed_hosts)
-        if remote:
-            return self.respond(404, b'')
         if url.path == '/api/notebooks':
             if self.command == 'GET':
                 kind = arg('kind', 'notebook')

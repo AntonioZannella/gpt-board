@@ -51,3 +51,13 @@ class HTTPTests(unittest.TestCase):
             return response.status, response.read()
         finally:
             conn.close()
+
+    def test_mcp_obeys_host_check_and_accepts_both_loopback_names(self):
+        message = json.dumps({'jsonrpc': '2.0', 'id': 1, 'method': 'tools/list'})
+        for host in ('localhost', '127.0.0.1'):
+            status, body = self.request(self.app.mcp_path, message, {'Host': host})
+            self.assertEqual(status, 200)
+            self.assertTrue(json.loads(body)['result']['tools'])
+        for headers in ({'Host': 'evil.example'}, {'Host': 'localhost.evil.example'},
+                        {'Host': 'localhost', 'X-Forwarded-For': '1.2.3.4'}):
+            self.assertEqual(self.request(self.app.mcp_path, message, headers)[0], 404)

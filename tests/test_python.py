@@ -180,7 +180,7 @@ class LiveProtocolTests(unittest.TestCase):
         self.assertEqual(self.request('/api/notebooks', bridge=True, headers={'Origin': 'https://unrelated.example'})[0], 403)
         self.assertEqual(self.request(self.app.mcp_path, bridge=True)[0], 404)
         status, data = self.request(self.app.mcp_path, {'jsonrpc': '2.0', 'id': 1, 'method': 'ping'}, headers={'x-forwarded-for': '1.2.3.4'})
-        self.assertEqual((status, json.loads(data)['result']), (200, {}))
+        self.assertEqual(status, 404)
 
 
 if __name__ == '__main__':
