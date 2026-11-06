@@ -4,7 +4,7 @@
 
 GPT Board is a personal handwriting workspace with saved notebooks, infinite whiteboards, and an MCP connection that lets an AI assistant read and work with the board.
 
-Built with AI assistance; designed and maintained by Antonio Zannella.
+Built with AI assistance; designed and maintained by the project author.
 
 The JavaScript frontend was built with AI assistance.
 
@@ -54,7 +54,7 @@ The existing `npm start`, `npm run build`, `npm run ipad`, `npm run session -- 1
 - `build.py` and `load_session.py`: build and prebuilt-board loading utilities.
 - `usage.py`: the existing Python reporting utility.
 
-The backend keeps the existing `data/` files, notebook IDs, tokens, port numbers, HTTP routes, and MCP tool schemas. `PORT`, `IPAD_HOST`, `IPAD_PORT`, `BOARD_PORT`, `MLS_CONTROLLER`, `MLS_PYTHON`, and `MLS_COURSES_JSON` remain supported. Review logging defaults to the existing sibling Math Learning System and initialized Calc 3 course; other courses require explicit configured mappings.
+The backend keeps the existing `data/` files, notebook IDs, tokens, port numbers, HTTP routes, and MCP tool schemas. `PORT`, `IPAD_HOST`, `IPAD_PORT`, `BOARD_PORT`, `MLS_CONTROLLER`, `MLS_PYTHON`, and `MLS_COURSES_JSON` remain supported. Review logging depends on an existing Math Learning System installation and initialized courses. The bundled defaults are installation-specific; configure explicit course mappings for your installation.
 
 PDF pages already imported into notebooks keep their original embedded images and frame records. Existing external PDF-generation scripts are not rewritten by this migration. Browser rendering and input remain JavaScript because they run inside Safari; native Pencil side-tap support would still require Swift.
 
