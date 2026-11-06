@@ -81,3 +81,20 @@ class HTTPTests(unittest.TestCase):
         headers['Content-Length'] = '2'
         with self.assertRaises(http_body.BodyError):
             http_body.read_body(BytesIO(b'{}'), headers)
+
+    def test_full_tab_queue_returns_without_blocking_or_leaking_pending(self):
+        import queue
+        import time
+        from server import MAX_PENDING_MESSAGES
+        messages = queue.Queue(maxsize=MAX_PENDING_MESSAGES)
+        for n in range(MAX_PENDING_MESSAGES):
+            messages.put_nowait({'n': n})
+        self.app.tabs['slow'] = {'queue': messages, 'notebook': 'default'}
+        started = time.monotonic()
+        result = self.app.send_to_tab('add', {})
+        self.assertFalse(result['ok'])
+        self.assertIn('busy', result['error'])
+        self.assertLess(time.monotonic() - started, .5)
+        self.assertEqual(self.app.pending, {})
+        self.assertEqual(messages.qsize(), MAX_PENDING_MESSAGES)
+        self.assertEqual(messages.get_nowait(), {'n': 0})

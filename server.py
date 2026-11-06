@@ -22,6 +22,9 @@ from board_review import ReviewService
 from http_body import BodyError, read_body
 
 
+MAX_PENDING_MESSAGES = 32
+
+
 def finite(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
@@ -50,7 +53,11 @@ class BoardApp:
             answer = queue.Queue(maxsize=1)
             self.pending[op_id] = answer
             notebook = target['notebook']
-            target['queue'].put({'opId': op_id, 'op': op, **args})
+            try:
+                target['queue'].put_nowait({'opId': op_id, 'op': op, **args})
+            except queue.Full:
+                self.pending.pop(op_id, None)
+                return {'ok': False, 'error': 'Board tab is busy. Wait for it to catch up, then retry.'}
         try:
             result = answer.get(timeout=timeout)
             return {**result, 'notebook': notebook}
@@ -262,7 +269,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.respond(200, path.read_bytes(), mime.get(path.suffix, 'application/octet-stream'))
 
     def events(self, tab, notebook):
-        client = {'queue': queue.Queue(), 'notebook': notebook}
+        client = {'queue': queue.Queue(maxsize=MAX_PENDING_MESSAGES), 'notebook': notebook}
         with self.app.lock:
             if not tab.startswith('legacy-'):
                 self.app.tabs[tab] = client
