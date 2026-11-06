@@ -31,7 +31,17 @@ from http_body import BodyError, read_body
 
 log = logging.getLogger('gpt-board')
 
-MAX_PENDING_MESSAGES = 32
+# MCP protocol versions this server speaks, newest first. initialize echoes a
+# supported client version and otherwise offers the newest.
+MCP_PROTOCOL_VERSIONS = ('2025-06-18', '2025-03-26')
+SERVER_VERSION = '1.1.0'
+DEFAULT_PORT = 8787
+ALLOWED_HOSTS = ('localhost', '127.0.0.1')
+TAB_REPLY_TIMEOUT_SECONDS = 5  # a board tab's answer to a drawing operation
+READ_BOARD_TIMEOUT_SECONDS = 8  # exporting an image takes the tab longer
+SSE_POLL_SECONDS = 0.25  # how often an idle stream checks for a closed tab
+SSE_PING_INTERVAL_SECONDS = 20
+SSE_QUEUE_SIZE = 32  # operations waiting for one tab's event stream
 
 
 def finite(value):
@@ -47,13 +57,13 @@ class BoardApp:
         self.storage = BoardStorage(root)
         self.review = ReviewService(self.storage)
         self.mcp_path = '/mcp/' + secret(self.storage.data / 'token', 16)
-        self.port = int(os.environ.get('PORT', '8787'))
-        self.allowed_hosts = {'localhost', '127.0.0.1'}
+        self.port = int(os.environ.get('PORT', DEFAULT_PORT))
+        self.allowed_hosts = set(ALLOWED_HOSTS)
         self.tabs, self.pending = {}, {}
         self.active_tab = None
         self.lock = threading.RLock()
 
-    def send_to_tab(self, op, args, timeout=5):
+    def send_to_tab(self, op, args, timeout=TAB_REPLY_TIMEOUT_SECONDS):
         with self.lock:
             target = self.tabs.get(self.active_tab) or next(iter(self.tabs.values()), None)
             if not target:
@@ -98,7 +108,7 @@ class BoardApp:
                 return text('A region requires an exact frame, top >= 0, and height > 0.', True)
             request = {key: args[key] for key in ('frame', 'region') if key in args}
             request.update(overview=args.get('overview') is True, include_details=args.get('include_details') is True)
-            result = self.send_to_tab('export', request, 8)
+            result = self.send_to_tab('export', request, READ_BOARD_TIMEOUT_SECONDS)
             if not result.get('ok'):
                 return text(result.get('error', 'Board operation failed.'), True)
             summary = result.get('summary') or {}
@@ -154,8 +164,10 @@ class BoardApp:
         method, params = message.get('method'), message.get('params') or {}
         response = {'jsonrpc': '2.0', 'id': message['id']}
         if method == 'initialize':
-            result = {'protocolVersion': params.get('protocolVersion', '2025-06-18'), 'capabilities': {'tools': {}},
-                      'serverInfo': {'name': 'gpt-board', 'version': '1.1.0'},
+            requested = params.get('protocolVersion')
+            version = requested if requested in MCP_PROTOCOL_VERSIONS else MCP_PROTOCOL_VERSIONS[0]
+            result = {'protocolVersion': version, 'capabilities': {'tools': {}},
+                      'serverInfo': {'name': 'gpt-board', 'version': SERVER_VERSION},
                       'instructions': "This is the user's personal notebook board. Use read_board to see the active notebook (the image shows handwriting). Use add_shapes / update_shapes / delete_shapes to draw. The active notebook is the one in the browser tab used most recently; there are no canvas IDs. " + self.review.instructions}
         elif method == 'ping':
             result = {}
@@ -339,7 +351,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.respond(200, path.read_bytes(), mime.get(path.suffix, 'application/octet-stream'))
 
     def events(self, tab, notebook):
-        client = {'queue': queue.Queue(maxsize=MAX_PENDING_MESSAGES), 'notebook': notebook}
+        client = {'queue': queue.Queue(maxsize=SSE_QUEUE_SIZE), 'notebook': notebook}
         with self.app.lock:
             if not tab.startswith('legacy-'):
                 self.app.tabs[tab] = client
@@ -359,10 +371,10 @@ class Handler(BaseHTTPRequestHandler):
                 if readable and not self.connection.recv(1, socket.MSG_PEEK):
                     break
                 try:
-                    event = client['queue'].get(timeout=.25)
+                    event = client['queue'].get(timeout=SSE_POLL_SECONDS)
                     data = ('data: ' + dumps(event) + '\n\n').encode()
                 except queue.Empty:
-                    if time.monotonic() - last_ping < 20:
+                    if time.monotonic() - last_ping < SSE_PING_INTERVAL_SECONDS:
                         continue
                     last_ping = time.monotonic()
                     data = b': ping\n\n'
@@ -377,7 +389,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def launch_options(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--port', type=int, default=int(os.environ.get('PORT', '8787')))
+    parser.add_argument('--port', type=int, default=int(os.environ.get('PORT', DEFAULT_PORT)))
     parser.add_argument('--lan', nargs='?', const='auto', metavar='IPV4',
                         help='Enable LAN access; optionally specify this Mac’s Wi-Fi IPv4 address.')
     options = parser.parse_args(argv)

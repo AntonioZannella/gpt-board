@@ -53,6 +53,15 @@ class HTTPTests(unittest.TestCase):
         finally:
             conn.close()
 
+    def test_initialize_negotiates_the_protocol_version(self):
+        import server
+        def negotiated(params):
+            return self.app.rpc({'jsonrpc': '2.0', 'id': 1, 'method': 'initialize', 'params': params})['result']['protocolVersion']
+        for version in server.MCP_PROTOCOL_VERSIONS:
+            self.assertEqual(negotiated({'protocolVersion': version}), version)
+        for params in ({'protocolVersion': '1999-01-01'}, {'protocolVersion': 5}, {}):
+            self.assertEqual(negotiated(params), server.MCP_PROTOCOL_VERSIONS[0])
+
     def test_mcp_obeys_host_check_and_accepts_both_loopback_names(self):
         message = json.dumps({'jsonrpc': '2.0', 'id': 1, 'method': 'tools/list'})
         for host in ('localhost', '127.0.0.1'):
@@ -118,9 +127,9 @@ class HTTPTests(unittest.TestCase):
         import queue
         import time
 
-        from server import MAX_PENDING_MESSAGES
-        messages = queue.Queue(maxsize=MAX_PENDING_MESSAGES)
-        for n in range(MAX_PENDING_MESSAGES):
+        from server import SSE_QUEUE_SIZE
+        messages = queue.Queue(maxsize=SSE_QUEUE_SIZE)
+        for n in range(SSE_QUEUE_SIZE):
             messages.put_nowait({'n': n})
         self.app.tabs['slow'] = {'queue': messages, 'notebook': 'default'}
         started = time.monotonic()
@@ -129,7 +138,7 @@ class HTTPTests(unittest.TestCase):
         self.assertIn('busy', result['error'])
         self.assertLess(time.monotonic() - started, .5)
         self.assertEqual(self.app.pending, {})
-        self.assertEqual(messages.qsize(), MAX_PENDING_MESSAGES)
+        self.assertEqual(messages.qsize(), SSE_QUEUE_SIZE)
         self.assertEqual(messages.get_nowait(), {'n': 0})
 
     def test_invalid_json_has_stable_parse_errors_without_exception_details(self):
