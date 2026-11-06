@@ -1,9 +1,12 @@
 """Bounded HTTP request framing shared by the board and iPad bridge."""
 import re
+import socket
+import threading
 
 MAX_BODY_BYTES = 64 * 1024 * 1024
-MAX_CHUNK_BYTES = MAX_BODY_BYTES
+MAX_CHUNKS = 1024
 MAX_LINE_BYTES = 8192
+BODY_TIMEOUT_SECONDS = 60
 
 
 class BodyError(ValueError):
@@ -13,7 +16,35 @@ class BodyError(ValueError):
         self.status = status
 
 
-def read_body(stream, headers):
+def read_body(stream, headers, connection=None, timeout=BODY_TIMEOUT_SECONDS):
+    """Read one request body. With `connection` (the socket under `stream`),
+    the whole read must finish within `timeout` seconds: a client trickling
+    bytes slowly cannot hold a server thread forever."""
+    if connection is None:
+        return _read_body(stream, headers)
+    expired = threading.Event()
+
+    def expire():
+        expired.set()
+        try:
+            connection.shutdown(socket.SHUT_RD)  # wakes the blocked read; replies can still be sent
+        except OSError:
+            pass  # the client already closed the connection
+
+    timer = threading.Timer(timeout, expire)
+    timer.daemon = True
+    timer.start()
+    try:
+        return _read_body(stream, headers)
+    except BodyError:
+        if expired.is_set():
+            raise BodyError('Request body timed out.', 408) from None
+        raise
+    finally:
+        timer.cancel()
+
+
+def _read_body(stream, headers):
     lengths = headers.get_all('Content-Length', [])
     encodings = headers.get_all('Transfer-Encoding', [])
     if len(lengths) > 1 or len(encodings) > 1 or (lengths and encodings):
@@ -32,15 +63,16 @@ def read_body(stream, headers):
         return value
 
     if encodings:
-        if encodings[0].lower() != 'chunked':
-            raise BodyError('Unsupported transfer encoding.')
+        if encodings[0].strip().lower() != 'chunked':
+            raise BodyError('Unsupported transfer encoding.', 501)
         chunks, total = [], 0
         while True:
             raw_size = line()[:-2].split(b';', 1)[0]
             if not re.fullmatch(rb'[0-9a-fA-F]+', raw_size):
                 raise BodyError('Invalid chunk length.')
             size = int(raw_size, 16)
-            if size > MAX_CHUNK_BYTES or total + size > MAX_BODY_BYTES:
+            # The total check alone bounds each chunk too.
+            if total + size > MAX_BODY_BYTES:
                 raise BodyError('Request body is too large.', 413)
             if size == 0:
                 trailer_bytes = 0
@@ -51,6 +83,8 @@ def read_body(stream, headers):
                         raise BodyError('Chunk trailers are too large.')
                     if trailer == b'\r\n':
                         return b''.join(chunks)
+            if len(chunks) >= MAX_CHUNKS:
+                raise BodyError('Request body has too many chunks.', 413)
             chunks.append(read_exact(size))
             total += size
             if read_exact(2) != b'\r\n':

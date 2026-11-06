@@ -75,7 +75,7 @@ class Bridge(BaseHTTPRequestHandler):
                 return self.reply(403)
             if not (url.path in ('/', '/index.html', '/native/app.js', '/native/model.js', '/native/style.css', '/api/board', '/api/events', '/api/ack', '/api/notebooks') or url.path.startswith('/assets/')):
                 return self.reply(404)
-            body = read_body(self.rfile, self.headers)
+            body = read_body(self.rfile, self.headers, self.connection)
             excluded = {'host', 'cookie', 'origin', 'referer', 'connection', 'transfer-encoding', 'content-length', 'proxy-connection'}
             headers = {key: value for key, value in self.headers.items() if key.lower() not in excluded}
             headers.update(Host=f'localhost:{config.upstream}', Connection='close')

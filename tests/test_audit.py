@@ -71,10 +71,12 @@ class HTTPTests(unittest.TestCase):
         for length in ('-1', 'oops', '+1'):
             self.assertEqual(self.request('/api/ack', b'', {'Content-Length': length})[0], 400)
         self.assertEqual(self.request('/api/ack', b'', {'Content-Length': str(http_body.MAX_BODY_BYTES + 1)})[0], 413)
-        with patch.multiple(http_body, MAX_BODY_BYTES=8, MAX_CHUNK_BYTES=6):
-            for data, expected in [(b'7\r\n', 413), (b'5\r\n12345\r\n4\r\n', 413),
-                                   (b'-1\r\n', 400), (b'nope\r\n', 400),
-                                   (b'1\r\naXX', 400), (b'3\r\na', 400)]:
+        with patch.multiple(http_body, MAX_BODY_BYTES=8, MAX_CHUNKS=2):
+            for data, expected in [(b'9\r\n', 413), (b'5\r\n12345\r\n4\r\n', 413),
+                                   (b'-1\r\n', 400), (b'nope\r\n', 400), (b'\r\n', 400),
+                                   (b'0x2\r\n', 400), (b' 2\r\n', 400), (b'2\n{}\r\n', 400),
+                                   (b'1\r\naXX', 400), (b'3\r\na', 400),
+                                   (b'1\r\na\r\n1\r\nb\r\n1\r\nc\r\n0\r\n\r\n', 413)]:
                 headers = Message(); headers['Transfer-Encoding'] = 'chunked'
                 with self.assertRaises(http_body.BodyError) as caught:
                     http_body.read_body(BytesIO(data), headers)
@@ -83,6 +85,34 @@ class HTTPTests(unittest.TestCase):
         headers['Content-Length'] = '2'
         with self.assertRaises(http_body.BodyError):
             http_body.read_body(BytesIO(b'{}'), headers)
+        for name, values, status in [('Content-Length', ['2', '2'], 400), ('Transfer-Encoding', ['gzip'], 501),
+                                     ('Transfer-Encoding', ['gzip, chunked'], 501), ('Content-Length', ['10'], 400)]:
+            headers = Message()
+            for value in values:
+                headers[name] = value
+            with self.assertRaises(http_body.BodyError) as caught:
+                http_body.read_body(BytesIO(b'{}'), headers)  # the last case is a truncated body
+            self.assertEqual(caught.exception.status, status)
+
+    def test_slow_body_times_out_as_a_whole(self):
+        import socket
+        from email.message import Message
+
+        import http_body
+        server_side, client = socket.socketpair()
+        try:
+            headers = Message(); headers['Content-Length'] = '10'
+            client.sendall(b'12')  # then never the rest
+            started = time.monotonic()
+            with self.assertRaises(http_body.BodyError) as caught:
+                http_body.read_body(server_side.makefile('rb'), headers, server_side, timeout=.2)
+            self.assertEqual(caught.exception.status, 408)
+            self.assertLess(time.monotonic() - started, 2)
+            status, _ = self.request('/api/ack', b'', {'Transfer-Encoding': 'gzip'})
+            self.assertEqual(status, 501)
+        finally:
+            server_side.close()
+            client.close()
 
     def test_full_tab_queue_returns_without_blocking_or_leaking_pending(self):
         import queue

@@ -206,7 +206,7 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def body(self, object_only=True):
-        value = json.loads(read_body(self.rfile, self.headers))
+        value = json.loads(read_body(self.rfile, self.headers, self.connection))
         if object_only and not isinstance(value, dict):
             raise BodyError('JSON body must be an object.')
         return value
