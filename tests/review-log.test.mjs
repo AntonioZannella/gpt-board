@@ -9,12 +9,15 @@ import { once } from 'node:events'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
-const controller = process.env.MLS_TEST_CONTROLLER || path.resolve(root, '../Math Learning System/mls.py')
+const controller = process.env.MLS_TEST_CONTROLLER
 const python = process.env.MLS_TEST_PYTHON || 'python3'
 const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII='
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
-test('real controller: MCP reviews preserve evidence, record distinct errors, and retry idempotently', async () => {
+// The controller is a separate install, so the test runs only when pointed at one.
+const skip = controller ? false : 'MLS_TEST_CONTROLLER is not set to a Math Learning System mls.py; the review-log integration test needs that external controller'
+
+test('real controller: MCP reviews preserve evidence, record distinct errors, and retry idempotently', { skip }, async () => {
     const tmp = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'gpt-board-review-')))
     const courseDir = path.join(tmp, 'mls')
     const errorLog = path.join(tmp, 'MathErrorLog.md')

@@ -71,7 +71,7 @@ The frontend is our own Canvas 2D engine. It has no tldraw, React, Vite, or othe
 
 ### Full-suite test prerequisite
 
-The review-log integration test needs the separate Math Learning System controller (`mls.py` and its imported code). Those files are not included in this repository. By default, the test looks for `../Math Learning System/mls.py`; a fresh clone in another directory will fail that test unless you set `MLS_TEST_CONTROLLER` to your installed controller:
+The review-log integration test needs the separate Math Learning System controller (`mls.py` and its imported code). Those files are not included in this repository, so the test is skipped, with the reason printed, unless `MLS_TEST_CONTROLLER` points to your installed controller:
 
 ```bash
 MLS_TEST_CONTROLLER="$HOME/Downloads/claude code/Math Learning System/mls.py" python3 test.py
