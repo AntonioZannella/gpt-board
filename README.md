@@ -1,16 +1,43 @@
 # GPT Board
 
+![gpt-board demo](docs/demo.gif)
+
 **Status:** Personal study tool, early stage. Setup is tied to my machine; not ready for other users yet.
 
 GPT Board is a personal handwriting workspace with saved notebooks, infinite whiteboards, and an MCP connection that lets an AI assistant read and work with the board.
 
-Built with AI assistance; designed and maintained by Antonio Zannella.
+Built with AI assistance; designed and maintained by the project author.
 
 The JavaScript frontend was built with AI assistance.
 
 ## Current status
 
 This is a working personal installation being prepared for a local-first beta. Public installation, cross-platform support, and multi-user hosting are not ready yet. The current setup includes a personal Math Learning System integration; copying this repository alone does not reproduce that setup or include its notebooks.
+
+## Architecture
+
+- **Browser board:** a Canvas 2D frontend handles drawing, handwriting input, page navigation and rendering locally in the browser. It saves edits through HTTP requests to the Python server.
+- **Python server:** a Python 3.10+ standard-library backend serves the board, persists notebooks and whiteboards, and exposes the MCP tools. Server-sent events (SSE) deliver operations to the active board tab; the tab returns results through HTTP requests.
+- **MCP client:** a connected AI client requests board images or calls drawing tools through the server. Reading and drawing require an open board tab. Review recording also depends on a separately configured Math Learning System.
+- **Optional iPad bridge:** a paired Python Wi-Fi proxy connects an iPad browser to the same board server. It forwards the board routes and event stream, but does not expose the MCP endpoint.
+
+## MCP tools
+
+These are the tools declared in `mcp_schema.json` and handled by the Python server:
+
+| Tool | What it does |
+| --- | --- |
+| `read_board` | Returns a fresh image of an exact page frame, lists frames when no frame is supplied, or reads an explicit whole-board overview. |
+| `add_shapes` | Adds shapes, text, sticky notes or arrows, with optional automatic placement. |
+| `update_shapes` | Moves, resizes, recolors or edits existing shapes by ID, changing only the supplied fields. |
+| `delete_shapes` | Deletes shapes by ID; tool instructions restrict deletion to AI-created shapes unless the user asks otherwise. |
+| `record_review` | Saves one checked problem, including correct or unresolved results, with fresh exact-frame evidence to the configured Math Learning System and error log. |
+
+## Trade-offs
+
+- **Standard library only:** nothing to install beyond Python to run the backend, and I wanted to learn Python itself rather than a framework. Browser drawing and input stay in JavaScript.
+- **SSE over WebSockets:** the server only needs to push edits one way to the board tab; the tab sends its responses over HTTP. SSE runs over plain HTTP, the browser reconnects on its own, and Python's standard library has no WebSocket support.
+- **MCP:** it is a standard protocol, so compatible AI clients, such as Codex or Claude, can read and draw on the board through the same tools without custom board code for each client. Each client still needs an MCP connection configured for this server.
 
 ## Using the existing installation
 
@@ -54,7 +81,7 @@ The existing `npm start`, `npm run build`, `npm run ipad`, `npm run session -- 1
 - `build.py` and `load_session.py`: build and prebuilt-board loading utilities.
 - `usage.py`: the existing Python reporting utility.
 
-The backend keeps the existing `data/` files, notebook IDs, tokens, port numbers, HTTP routes, and MCP tool schemas. `PORT`, `IPAD_HOST`, `IPAD_PORT`, `BOARD_PORT`, `MLS_CONTROLLER`, `MLS_PYTHON`, and `MLS_COURSES_JSON` remain supported. Review logging defaults to the existing sibling Math Learning System and initialized Calc 3 course; other courses require explicit configured mappings.
+The backend keeps the existing `data/` files, notebook IDs, tokens, port numbers, HTTP routes, and MCP tool schemas. `PORT`, `IPAD_HOST`, `IPAD_PORT`, `BOARD_PORT`, `MLS_CONTROLLER`, `MLS_PYTHON`, and `MLS_COURSES_JSON` remain supported. Review logging depends on an existing Math Learning System installation and initialized courses. The bundled defaults are installation-specific; configure explicit course mappings for your installation.
 
 PDF pages already imported into notebooks keep their original embedded images and frame records. Existing external PDF-generation scripts are not rewritten by this migration. Browser rendering and input remain JavaScript because they run inside Safari; native Pencil side-tap support would still require Swift.
 
