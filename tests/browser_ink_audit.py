@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Serve a disposable browser ink regression notebook; never touches user data."""
 import argparse
-from http.server import ThreadingHTTPServer
-from pathlib import Path
 import shutil
 import sys
 import tempfile
+from http.server import ThreadingHTTPServer
+from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from board_storage import empty_snapshot, write_json
 from build import build

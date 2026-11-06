@@ -2,13 +2,14 @@
 """Paired local Wi-Fi bridge for iPad. Never forwards the MCP endpoint."""
 import http.client
 import json
-from http_body import BodyError, read_body
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import os
 import socket
 import subprocess
-from urllib.parse import urlsplit, parse_qs
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlsplit
+
 from board_storage import ROOT, secret
+from http_body import BodyError, read_body
 
 
 def wifi_host():

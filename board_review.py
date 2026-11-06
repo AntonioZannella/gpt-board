@@ -2,13 +2,23 @@
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import subprocess
 import tempfile
 import threading
 import uuid
-from board_storage import ROOT, LOCK, ClientError, dumps, atomic_write, append_json, stamp, decode_png
+from pathlib import Path
+
+from board_storage import (
+    LOCK,
+    ROOT,
+    ClientError,
+    append_json,
+    atomic_write,
+    decode_png,
+    dumps,
+    stamp,
+)
 
 REVIEW_LOCK = threading.Lock()
 
@@ -108,7 +118,7 @@ class ReviewService:
         command = [os.environ.get('MLS_PYTHON', 'python3'), self.controller, '--dir', self.courses[payload['course']], 'board-review', '--file', '-']
         with REVIEW_LOCK, tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
             try:
-                child = subprocess.run(command, input=dumps(payload).encode(), stdout=out, stderr=err, timeout=30)
+                child = subprocess.run(command, input=dumps(payload).encode(), stdout=out, stderr=err, timeout=30, check=False)
             except subprocess.TimeoutExpired as exc:
                 raise ClientError('Review controller timed out. Logging is not confirmed; retry the same review.') from exc
             except OSError as exc:

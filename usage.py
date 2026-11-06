@@ -12,8 +12,14 @@ estimate: included plan usage has no verified credit conversion. Voice cost is n
 logs, so voice is shown only as minutes. Meter ticks mix usage with rounding and cannot
 pin down a per-minute voice rate.
 """
-import json, sys, glob, os, statistics, time
+import glob
+import json
+import os
+import statistics
+import sys
+import time
 from datetime import datetime
+from pathlib import Path
 
 # Credits per 1M tokens: (input, cached input, output). Standard speed.
 RATES = {
@@ -25,7 +31,7 @@ FAST_MULT = 2.5  # included-usage multiplier for the Fast (priority) tier, per t
 
 
 def ts(s):
-    return datetime.fromisoformat(s.replace('Z', '+00:00')).timestamp()
+    return datetime.fromisoformat(s).timestamp()
 
 
 def report(path):
@@ -33,7 +39,7 @@ def report(path):
     credits = 0.0
     calls, replies, meter, voice, contexts = [], [], [], [], []
     last = turn_start = None
-    for line in open(path):
+    for line in Path(path).read_text().splitlines():
         try:
             d = json.loads(line)
         except ValueError:

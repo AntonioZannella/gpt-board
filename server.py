@@ -1,26 +1,32 @@
 #!/usr/bin/env python3
 """GPT Board HTTP, SSE and MCP server. Python standard library only."""
 import argparse
-import base64
 import ipaddress
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import math
 import os
-from pathlib import Path
 import queue
+import re
 import select
 import socket
-import time
-import re
 import sys
 import threading
-from urllib.parse import urlsplit, parse_qs, unquote
+import time
 import uuid
-from board_storage import ROOT, LOCK, BoardSizeError, BoardStorage, ClientError, dumps, secret, decode_png
-from board_review import ReviewService
-from http_body import BodyError, read_body
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, unquote, urlsplit
 
+from board_review import ReviewService
+from board_storage import (
+    ROOT,
+    BoardSizeError,
+    BoardStorage,
+    ClientError,
+    decode_png,
+    dumps,
+    secret,
+)
+from http_body import BodyError, read_body
 
 MAX_PENDING_MESSAGES = 32
 

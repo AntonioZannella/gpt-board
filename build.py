@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build the dependency-free browser frontend; no Node toolchain needed."""
 from pathlib import Path
+
 from board_storage import ROOT, atomic_write
 
 

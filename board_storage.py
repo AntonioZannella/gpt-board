@@ -1,20 +1,21 @@
 """Persistent notebook records shared by the HTTP server and local utilities."""
 from __future__ import annotations
+
 import base64
 import binascii
 import copy
-import struct
-import zlib
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import secrets
+import struct
 import tempfile
 import threading
 import unicodedata
-from datetime import datetime, timezone
+import zlib
+from datetime import UTC, datetime
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 LOCK = threading.RLock()
@@ -112,7 +113,7 @@ def append_json(path, value):
 
 
 def stamp():
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return {'t': now.timestamp(), 'ts': now.isoformat(timespec='milliseconds').replace('+00:00', 'Z')}
 
 

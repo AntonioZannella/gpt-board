@@ -1,24 +1,25 @@
 """Python backend regression tests. All writes stay in temporary fixtures."""
-from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import http.client
 import json
-from pathlib import Path
-import socket
+import sys
 import tempfile
 import threading
 import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from unittest.mock import patch
-import sys
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from board_storage import BoardStorage, empty_snapshot, write_json, read_json, atomic_write, dumps
-from board_review import ReviewService
-from server import BoardApp, Handler
-from ipad_server import Bridge
 from http.server import ThreadingHTTPServer
-from load_session import load_session
+
+from board_review import ReviewService
+from board_storage import BoardStorage, atomic_write, dumps, empty_snapshot, write_json
 from build import build
+from ipad_server import Bridge
+from load_session import load_session
+from server import BoardApp, Handler
 
 
 class StorageTests(unittest.TestCase):
@@ -44,9 +45,8 @@ class StorageTests(unittest.TestCase):
     def test_failed_atomic_replacement_keeps_original(self):
         target = self.root / 'data/board.json'
         original = target.read_bytes()
-        with patch('board_storage.os.replace', side_effect=OSError('disk fault')):
-            with self.assertRaises(OSError):
-                atomic_write(target, b'broken')
+        with patch('board_storage.os.replace', side_effect=OSError('disk fault')), self.assertRaises(OSError):
+            atomic_write(target, b'broken')
         self.assertEqual(target.read_bytes(), original)
         self.assertEqual(list(target.parent.glob('.board.json-*')), [])
 
@@ -179,7 +179,7 @@ class LiveProtocolTests(unittest.TestCase):
         self.assertEqual(self.request('/%2e%2e/data/token')[0], 404)
         self.assertEqual(self.request('/api/notebooks', bridge=True, headers={'Origin': 'https://unrelated.example'})[0], 403)
         self.assertEqual(self.request(self.app.mcp_path, bridge=True)[0], 404)
-        status, data = self.request(self.app.mcp_path, {'jsonrpc': '2.0', 'id': 1, 'method': 'ping'}, headers={'x-forwarded-for': '1.2.3.4'})
+        status, _ = self.request(self.app.mcp_path, {'jsonrpc': '2.0', 'id': 1, 'method': 'ping'}, headers={'x-forwarded-for': '1.2.3.4'})
         self.assertEqual(status, 404)
 
 

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Load one existing prebuilt Calc 3 session, backing up the previous board."""
 import argparse
-from datetime import datetime, timezone
 import json
-from pathlib import Path
 import shutil
+from datetime import UTC, datetime
+from pathlib import Path
+
 from board_storage import ROOT, write_json
 
 
@@ -22,7 +23,7 @@ def load_session(number, root=ROOT):
     if board.exists():
         backups = root / 'data/backups'
         backups.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H-%M-%S-%fZ')
+        stamp = datetime.now(UTC).strftime('%Y-%m-%dT%H-%M-%S-%fZ')
         shutil.copy2(board, backups / f'board-{stamp}.json')
     write_json(board, {'store': {r['id']: r for r in records}, 'schema': schema})
     for name in ('summary.json', 'board.png'):

@@ -1,15 +1,15 @@
 """Security regressions; no personal notebooks or live server are used."""
 import http.client
 import json
-from pathlib import Path
 import tempfile
 import threading
 import unittest
-from unittest.mock import patch
 from http.server import ThreadingHTTPServer
+from pathlib import Path
+from unittest.mock import patch
 
-from server import BoardApp, Handler, launch_options
 from board_storage import empty_snapshot, write_json
+from server import BoardApp, Handler, launch_options
 
 
 class LaunchTests(unittest.TestCase):
@@ -65,6 +65,7 @@ class HTTPTests(unittest.TestCase):
     def test_body_lengths_and_chunks_are_bounded_before_reading(self):
         from email.message import Message
         from io import BytesIO
+
         import http_body
         for length in ('-1', 'oops', '+1'):
             self.assertEqual(self.request('/api/ack', b'', {'Content-Length': length})[0], 400)
@@ -85,6 +86,7 @@ class HTTPTests(unittest.TestCase):
     def test_full_tab_queue_returns_without_blocking_or_leaking_pending(self):
         import queue
         import time
+
         from server import MAX_PENDING_MESSAGES
         messages = queue.Queue(maxsize=MAX_PENDING_MESSAGES)
         for n in range(MAX_PENDING_MESSAGES):
@@ -113,7 +115,7 @@ class HTTPTests(unittest.TestCase):
             for path in ('/api/board', '/api/ack', '/api/notebooks'):
                 self.assertEqual(self.request(path, json.dumps(body))[0], 400)
         for body in (None, 'text', 4, []):
-            status, data = self.request(self.app.mcp_path, json.dumps(body))
+            _, data = self.request(self.app.mcp_path, json.dumps(body))
             self.assertEqual(json.loads(data)['error']['code'], -32600)
         for params in ([], 'x', 1):
             result = self.app.rpc({'jsonrpc': '2.0', 'id': 1, 'method': 'tools/call', 'params': params})
