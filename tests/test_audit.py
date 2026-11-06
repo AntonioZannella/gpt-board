@@ -159,3 +159,33 @@ class HTTPTests(unittest.TestCase):
             result = self.app.call_tool('record_review', {})
         self.assertTrue(result['isError'])
         self.assertNotIn('private', result['content'][0]['text'])
+
+
+class LoggingTests(unittest.TestCase):
+    def test_log_lines_never_contain_tokens_or_pairing_keys(self):
+        import io
+        import logging
+
+        from board_storage import RedactingFormatter
+        token, pairing = 'a1b2c3d4e5f60718', 'f00dfeedbeefcafe'
+        stream = io.StringIO()
+        handler = logging.StreamHandler(stream)
+        handler.setFormatter(RedactingFormatter([token]))
+        logger = logging.getLogger('gpt-board.redaction-test')
+        logger.addHandler(handler)
+        logger.propagate = False
+        logger.setLevel(logging.INFO)
+        try:
+            logger.error('Unhandled error on POST %s', '/mcp/' + token)
+            logger.info('Pair iPad: http://10.0.0.8:8788/pair?key=%s', pairing)
+            try:
+                raise RuntimeError('token was ' + token)
+            except RuntimeError:
+                logger.exception('failure')
+        finally:
+            logger.removeHandler(handler)
+        output = stream.getvalue()
+        self.assertNotIn(token, output)
+        self.assertNotIn(pairing, output)
+        self.assertIn('/mcp/[redacted]', output)
+        self.assertIn('key=[redacted]', output)

@@ -3,13 +3,13 @@
 import argparse
 import ipaddress
 import json
+import logging
 import math
 import os
 import queue
 import re
 import select
 import socket
-import sys
 import threading
 import time
 import uuid
@@ -25,8 +25,11 @@ from board_storage import (
     decode_png,
     dumps,
     secret,
+    setup_logging,
 )
 from http_body import BodyError, read_body
+
+log = logging.getLogger('gpt-board')
 
 MAX_PENDING_MESSAGES = 32
 
@@ -83,6 +86,7 @@ class BoardApp:
             except ClientError as exc:
                 return text(exc.reason, True)
             except Exception:
+                log.exception('record_review failed')
                 return text('The review failed unexpectedly and was not saved. Retry the same review.', True)
         if name == 'read_board':
             if 'frame' in args and (not isinstance(args['frame'], str) or not args['frame'].strip()):
@@ -120,8 +124,8 @@ class BoardApp:
                     if check.get('region'):
                         context['region'] = check['region']
                     summary['review_context'] = context
-                except Exception as exc:
-                    print('check image not saved:', exc, file=sys.stderr)
+                except Exception:
+                    log.exception('Check image not saved')
                     summary['review_warning'] = 'The review image could not be archived. Do not claim this review is logged; retry read_board before record_review.'
             content.append({'type': 'text', 'text': dumps(summary)})
             return {'content': content}
@@ -219,6 +223,8 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self.respond(400, {'error': 'Invalid JSON.'})
         except Exception:
+            # The formatter set up in main() redacts the MCP token from the path.
+            log.exception('Unhandled error on %s %s', self.command, urlsplit(self.path).path)
             self.close_connection = True
             self.respond(500, {'error': 'Internal server error.'})
 
@@ -382,14 +388,15 @@ def main():
     options = launch_options()
     app = BoardApp()
     app.port = options.port
+    setup_logging(app.mcp_path.rsplit('/', 1)[-1])
     if options.lan:
         app.allowed_hosts.add(options.lan)
     server = ThreadingHTTPServer(('0.0.0.0' if options.lan else '127.0.0.1', app.port), Handler)
     server.daemon_threads = True
     server.app = app
-    print(f'Board: http://localhost:{app.port} (Python)', flush=True)
+    log.info('Board: http://localhost:%s (Python)', app.port)
     if options.lan:
-        print(f'LAN board: http://{options.lan}:{app.port}', flush=True)
+        log.info('LAN board: http://%s:%s', options.lan, app.port)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

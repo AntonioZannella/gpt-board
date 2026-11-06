@@ -6,10 +6,12 @@ import binascii
 import copy
 import hashlib
 import json
+import logging
 import os
 import re
 import secrets
 import struct
+import sys
 import tempfile
 import threading
 import unicodedata
@@ -128,6 +130,31 @@ def secret(path, size):
     with os.fdopen(fd, 'w') as stream:
         stream.write(value)
     return value
+
+
+# MCP URL paths, pairing-link keys and the iPad cookie all carry secrets.
+SECRET_PATTERN = re.compile(r'(/mcp/|[?&]key=|board_ipad=)[^\s&;\'"]+')
+
+
+class RedactingFormatter(logging.Formatter):
+    """Masks secrets in the whole formatted record, tracebacks included."""
+
+    def __init__(self, values=()):
+        super().__init__('%(asctime)s %(levelname)s %(message)s')
+        self.secrets = [value for value in values if value]
+
+    def format(self, record):
+        text = SECRET_PATTERN.sub(r'\1[redacted]', super().format(record))
+        for value in self.secrets:
+            text = text.replace(value, '[redacted]')
+        return text
+
+
+def setup_logging(*values):
+    # stdout, because the launchers and tests wait for the first startup line there.
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(RedactingFormatter(values))
+    logging.basicConfig(level=logging.INFO, handlers=[handler], force=True)
 
 
 def blank_snapshot(source, name):

@@ -2,14 +2,17 @@
 """Paired local Wi-Fi bridge for iPad. Never forwards the MCP endpoint."""
 import http.client
 import json
+import logging
 import os
 import socket
 import subprocess
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
-from board_storage import ROOT, secret
+from board_storage import ROOT, secret, setup_logging
 from http_body import BodyError, read_body
+
+log = logging.getLogger('gpt-board.ipad')
 
 
 def wifi_host():
@@ -115,8 +118,11 @@ def main():
     server.origin = 'http://' + server.authority
     server.upstream = int(os.environ.get('BOARD_PORT', '8787'))
     server.token = secret(ROOT / 'data/ipad-token', 24)
-    print(f'iPad bridge: {server.origin} (Python)', flush=True)
+    setup_logging(server.token)
+    log.info('iPad bridge: %s (Python)', server.origin)
     if os.environ.get('SHOW_PAIRING_LINK') == '1':
+        # Deliberately printed, not logged: the user asked to see the secret
+        # link on this terminal, and the log formatter would redact it.
         print(f'Pair iPad: {server.origin}/pair?key={server.token}', flush=True)
     try:
         server.serve_forever()

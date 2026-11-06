@@ -1,6 +1,7 @@
 """Archived board evidence and the canonical Math Learning System CLI bridge."""
 import hashlib
 import json
+import logging
 import os
 import re
 import subprocess
@@ -21,6 +22,7 @@ from board_storage import (
 )
 
 REVIEW_LOCK = threading.Lock()
+log = logging.getLogger('gpt-board.review')
 
 
 class ReviewService:
@@ -122,6 +124,7 @@ class ReviewService:
             except subprocess.TimeoutExpired as exc:
                 raise ClientError('Review controller timed out. Logging is not confirmed; retry the same review.') from exc
             except OSError as exc:
+                log.exception('Review controller could not start')
                 raise ClientError('Review controller could not start. Check MLS_CONTROLLER and MLS_PYTHON.') from exc
             if out.tell() > 1024 * 1024 or err.tell() > 1024 * 1024:
                 raise ClientError('Review controller output exceeded its limit.')
@@ -130,6 +133,7 @@ class ReviewService:
         if child.returncode:
             # The controller's own refusal ("Controller busy...", "superseded by...")
             # tells the AI what to do next; only its last line goes back, capped.
+            log.warning('Review controller exited %s: %s', child.returncode, (stderr or stdout).strip())
             lines = (stderr or stdout).strip().splitlines()
             detail = lines[-1][:300] if lines else f'controller exited {child.returncode}'
             raise ClientError('Review was not confirmed saved: ' + detail)
