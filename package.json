@@ -1,0 +1,12 @@
+{
+  "name": "gpt-board",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "python3 build.py",
+    "start": "python3 server.py",
+    "session": "python3 load_session.py",
+    "ipad": "python3 ipad_server.py",
+    "test": "python3 test.py"
+  }
+}

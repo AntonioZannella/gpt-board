@@ -1,0 +1,32 @@
+# Private notebooks, tokens, review evidence, and course content
+/data/
+/sessions/
+/code-backups/
+/.claude/
+/.codex/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Generated frontend and old dependency installation
+/dist/
+/node_modules/
+
+# Python environments and caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local logs and OS metadata
+*.log
+logs/
+.DS_Store
+Thumbs.db
