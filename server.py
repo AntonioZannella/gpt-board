@@ -176,9 +176,22 @@ class Handler(BaseHTTPRequestHandler):
     def app(self):
         return self.server.app
 
+    response_started = False
+
     def log_message(self, *_):
         # Avoid logging secret MCP URLs or large notebook payloads.
         pass
+
+    def send_response(self, code, message=None):
+        self.response_started = True
+        super().send_response(code, message)
+
+    def fail(self, status, body):
+        self.close_connection = True
+        # Once a status line is out (an SSE stream, or a reply cut off midway),
+        # a second one would corrupt the stream; just close the connection.
+        if not self.response_started:
+            self.respond(status, body)
 
     def respond(self, status, body=b'', content_type='application/json', headers=None):
         if not isinstance(body, bytes):
@@ -208,25 +221,23 @@ class Handler(BaseHTTPRequestHandler):
         self.handle_request()
 
     def handle_request(self):
+        self.response_started = False
         try:
             self.route()
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             pass
         except BodyError as exc:
-            self.close_connection = True
-            self.respond(exc.status, {'error': exc.reason})
+            self.fail(exc.status, {'error': exc.reason})
         except (json.JSONDecodeError, UnicodeDecodeError, RecursionError):
-            self.close_connection = True
             if urlsplit(self.path).path == self.app.mcp_path:
-                self.respond(400, {'jsonrpc': '2.0', 'id': None,
-                                   'error': {'code': -32700, 'message': 'Parse error'}})
+                self.fail(400, {'jsonrpc': '2.0', 'id': None,
+                                'error': {'code': -32700, 'message': 'Parse error'}})
             else:
-                self.respond(400, {'error': 'Invalid JSON.'})
+                self.fail(400, {'error': 'Invalid JSON.'})
         except Exception:
             # The formatter set up in main() redacts the MCP token from the path.
             log.exception('Unhandled error on %s %s', self.command, urlsplit(self.path).path)
-            self.close_connection = True
-            self.respond(500, {'error': 'Internal server error.'})
+            self.fail(500, {'error': 'Internal server error.'})
 
     def route(self):
         app = self.app

@@ -3,6 +3,7 @@ import http.client
 import json
 import tempfile
 import threading
+import time
 import unittest
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -160,6 +161,27 @@ class HTTPTests(unittest.TestCase):
         self.assertTrue(result['isError'])
         self.assertNotIn('private', result['content'][0]['text'])
 
+
+    def test_error_after_sse_starts_closes_without_a_second_response(self):
+        import socket
+        sock = socket.create_connection(('127.0.0.1', self.server.server_port), timeout=3)
+        try:
+            sock.sendall(b'GET /api/events?tab=t1 HTTP/1.1\r\nHost: localhost\r\n\r\n')
+            received = b''
+            while b': connected' not in received:
+                received += sock.recv(4096)
+            for _ in range(100):
+                if 't1' in self.app.tabs:
+                    break
+                time.sleep(.01)
+            with self.assertLogs('gpt-board', 'ERROR'):
+                self.app.tabs['t1']['queue'].put({'bad': float('nan')})  # dumps refuses NaN
+                while chunk := sock.recv(4096):
+                    received += chunk
+        finally:
+            sock.close()
+        self.assertEqual(received.count(b'HTTP/1.1'), 1)
+        self.assertNotIn(b'Internal server error', received)
 
 class LoggingTests(unittest.TestCase):
     def test_log_lines_never_contain_tokens_or_pairing_keys(self):
