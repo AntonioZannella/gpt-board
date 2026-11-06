@@ -12,6 +12,13 @@ The JavaScript frontend was built with AI assistance.
 
 This is a working personal installation being prepared for a local-first beta. Public installation, cross-platform support, and multi-user hosting are not ready yet. The current setup includes a personal Math Learning System integration; copying this repository alone does not reproduce that setup or include its notebooks.
 
+## Architecture
+
+- **Browser board:** a Canvas 2D frontend handles drawing, handwriting input, page navigation and rendering locally in the browser. It saves edits through HTTP requests to the Python server.
+- **Python server:** a Python 3.10+ standard-library backend serves the board, persists notebooks and whiteboards, and exposes the MCP tools. Server-sent events (SSE) deliver operations to the active board tab; the tab returns results through HTTP requests.
+- **MCP client:** a connected AI client requests board images or calls drawing tools through the server. Reading and drawing require an open board tab. Review recording also depends on a separately configured Math Learning System.
+- **Optional iPad bridge:** a paired Python Wi-Fi proxy connects an iPad browser to the same board server. It forwards the board routes and event stream, but does not expose the MCP endpoint.
+
 ## Using the existing installation
 
 Open <http://localhost:8787> on the computer running GPT Board. On the iPad, use your existing paired board address. Existing launch commands are listed below; if the services are already running, keep using them without launching another copy.
