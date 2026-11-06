@@ -69,6 +69,16 @@ The frontend is our own Canvas 2D engine. It has no tldraw, React, Vite, or othe
 - `python3 -m unittest discover -s tests -p 'test_*.py' -v`: Python backend tests.
 - `python3 test.py`: all Python tests plus the JavaScript drawing/client contract checks (Node needed only for those checks).
 
+### Full-suite test prerequisite
+
+The review-log integration test needs the separate Math Learning System controller (`mls.py` and its imported code). Those files are not included in this repository. By default, the test looks for `../Math Learning System/mls.py`; a fresh clone in another directory will fail that test unless you set `MLS_TEST_CONTROLLER` to your installed controller:
+
+```bash
+MLS_TEST_CONTROLLER="$HOME/Downloads/claude code/Math Learning System/mls.py" python3 test.py
+```
+
+Adjust that path for your installation. The test creates a temporary course and error log and does not use your real course records. `MLS_TEST_PYTHON` selects the controller's Python interpreter if needed. The Python-only command above does not require this external controller; it is not a substitute for the full suite. The full suite currently runs 16 Python tests and 8 JavaScript tests.
+
 The existing `npm start`, `npm run build`, `npm run ipad`, `npm run session -- 1`, and `npm test` commands also work; they invoke Python. The old JavaScript server/bridge/build/session entry points are small compatibility launchers, with no backend implementation remaining in JavaScript. Node is not needed to run the app with the Python commands.
 
 ## Python backend
