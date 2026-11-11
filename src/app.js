@@ -1,7 +1,7 @@
 import { installInkPicker } from './ink-picker.js';
 import { createImageCache } from './image-cache.js';
 import { createJournalDatabase } from './journal-db.js';
-import { installFollow, resumeTabletPage } from './follow.js';
+import { viewportCamera, installFollow, resumeTabletPage } from './follow.js';
 import { installSwipeDiagnostics } from './swipe-diagnostics.js';
 import { TrackpadPager, wheelPixels, navigationKey } from './trackpad.js';
 import { pageLinkAt, isLinkTap } from './pdf-links.js';
@@ -1854,7 +1854,8 @@ async function exportImage(box, includeAI = true, longestSide = 1600) {
   c.fillRect(0, 0, out.width, out.height);
   c.scale(scale, scale);
   c.translate(-box.x, -box.y);
-  for (const s of shapes) {
+  let batchStarted = performance.now();
+  for (const s of [...shapes]) {
     if (!includeAI && s.meta?.ai) continue;
     if (!intersects(getBounds(s), box)) continue;
     if (s.type === 'image') {
@@ -1864,8 +1865,22 @@ async function exportImage(box, includeAI = true, longestSide = 1600) {
       if (!im.naturalWidth) throw Error('A page image failed to load');
     }
     paintWorld(c, s);
+    if (performance.now() - batchStarted >= 8) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+      batchStarted = performance.now();
+    }
   }
-  return { png: out.toDataURL(), scale };
+  // Let the browser encode off the input callback instead of synchronously
+  // blocking Pencil events with toDataURL(). The canvas is a detached snapshot.
+  const blob = await new Promise((resolve, reject) => out.toBlob(
+    value => value ? resolve(value) : reject(Error('Could not encode the page image.')), 'image/png'));
+  const png = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(Error('Could not read the page image.'));
+    reader.readAsDataURL(blob);
+  });
+  return { png, scale };
 }
 
 function allBounds() {
@@ -1874,9 +1889,12 @@ function allBounds() {
 // Carry out one AI request. Edits return a `rollback` function so the caller
 // can undo them if the AI client had already given up waiting.
 async function operation(msg) {
-  finishActive();
+  if (gesture || penActive)
+    return {ok: false, error: 'Drawing is in progress. Retry the read after the Pencil lifts.'};
   if (msg.op === 'export') {
     await save();
+    if (gesture || penActive)
+      return {ok: false, error: 'Drawing started during the read. Retry after the Pencil lifts.'};
     if (dirty) return { ok: false, error: 'Save or resolve pending edits before an AI read.' };
     if (!msg.frame && !msg.current_page && frames.length && !msg.overview)
       return {
@@ -1907,7 +1925,10 @@ async function operation(msg) {
       b.h = Math.min(height, b.h - top);
       region = { top, height: b.h };
     }
+    const readRevision = revision, readBase = baseRev;
     const { png, scale } = await exportImage(b);
+    if (gesture || penActive || revision !== readRevision || baseRev !== readBase)
+      return {ok: false, error: 'The board changed during the image capture. Request a fresh read.'};
     return {
       ok: true,
       png,
@@ -2469,7 +2490,12 @@ try {
     viewChanged();
     new ResizeObserver(resize).observe(canvas);
     follow = installFollow({tab, book, kind, buttonAfter: $('fit'),
-      getState: () => ({frame: current()?.id, frames: frames.map(f => f.id), busy: !!gesture || dirty}),
+      getState: () => ({frame: current()?.id, frames: frames.map(f => f.id), busy: !!gesture || dirty,
+        viewport: {x: -camera.x, y: -camera.y, w: W/camera.z, h: H/camera.z}}),
+      showViewport: viewport => {
+        const next = viewportCamera(viewport, W, H);
+        if (isWhiteboard && next) { camera = next; viewChanged(); }
+      },
       showPage, navigate});
     const es = new EventSource(`/api/events?tab=${tab}&notebook=${encodeURIComponent(book)}`);
     es.onopen = () => {

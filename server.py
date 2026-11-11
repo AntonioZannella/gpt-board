@@ -209,6 +209,13 @@ class BoardApp:
                 or not isinstance(body.get('visible'), bool)
                 or (frame is not None and (not isinstance(frame, str) or len(frame) > 200))):
             raise ClientError('Invalid tablet presence.')
+        viewport = body.get('viewport') if kind == 'whiteboard' else None
+        if viewport is not None:
+            if (not isinstance(viewport, dict)
+                    or any(not finite(viewport.get(k)) for k in ('x', 'y', 'w', 'h'))
+                    or viewport['w'] <= 0 or viewport['h'] <= 0):
+                raise ClientError('Invalid tablet viewport.')
+            viewport = {k: viewport[k] for k in ('x', 'y', 'w', 'h')}
         with self.lock:
             client = self.tabs.get(tab_id)
             if client is None:
@@ -217,10 +224,10 @@ class BoardApp:
                 client.pop('view', None)
                 return
             view = {'tab': tab_id, 'notebook': client['notebook'], 'kind': kind,
-                    'frame': frame, 'updated': time.monotonic()}
+                    'frame': frame, 'viewport': viewport, 'updated': time.monotonic()}
             previous = client.get('view')
             client['view'] = view
-            if previous and all(previous[k] == view[k] for k in ('notebook', 'kind', 'frame')):
+            if previous and all(previous.get(k) == view[k] for k in ('notebook', 'kind', 'frame', 'viewport')):
                 return
             for other in self.tabs.values():
                 if other is client:

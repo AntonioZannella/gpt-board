@@ -1,6 +1,6 @@
 # Current source verification — November 11, 2026
 
-The updated source passes 115 Python tests and 64 JavaScript tests on macOS; one optional external-controller integration is skipped. Hosted CI status is shown on the repository Actions page. The native wrapper previously built and ran on a physical iPad; the latest color-picker Pencil behavior still needs physical verification. This is not Windows or universal-device certification.
+The updated source passes 117 Python tests and 69 JavaScript tests on macOS; one optional external-controller integration is skipped. Hosted CI status is shown on the repository Actions page. The native wrapper previously built and ran on a physical iPad; the latest color-picker Pencil behavior, whiteboard viewport following, and AI-read freeze mitigation still need physical verification. This is not Windows or universal-device certification.
 
 ## Historical candidate record
 

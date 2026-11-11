@@ -44,3 +44,22 @@ class FollowTests(unittest.TestCase):
     def test_invalid_presence_is_rejected(self):
         for bad in ({'tablet':False},{'kind':'other'},{'frame':[]},{'visible':'yes'}):
             with self.assertRaises(ClientError):self.app.update_tablet_view({**self.body,**bad})
+
+    def test_whiteboard_pan_broadcasts_without_a_page_change(self):
+        body = {**self.body, 'kind': 'whiteboard', 'frame': None,
+                'viewport': {'x': 4000, 'y': -3000, 'w': 800, 'h': 1200}}
+        for x in (4000, 5000):
+            body['viewport']['x'] = x
+            self.app.update_tablet_view(body)
+            event = self.app.tabs['mac']['queue'].get_nowait()
+            self.assertEqual(event['viewport']['x'], x)
+            self.assertEqual(self.app.tablet_view()['viewport']['x'], x)
+        self.app.update_tablet_view(body)
+        self.assertTrue(self.app.tabs['mac']['queue'].empty())
+        self.assertFalse((Path(self.tmp.name) / 'data' / 'board.json').exists())
+
+    def test_invalid_whiteboard_viewport_is_rejected(self):
+        for viewport in ({}, {'x': 0, 'y': 0, 'w': 0, 'h': 10},
+                         {'x': float('nan'), 'y': 0, 'w': 10, 'h': 10}):
+            with self.assertRaises(ClientError):
+                self.app.update_tablet_view({**self.body, 'kind': 'whiteboard', 'viewport': viewport})

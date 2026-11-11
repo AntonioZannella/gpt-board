@@ -1,5 +1,12 @@
 # Changelog
 
+## Follow and drawing responsiveness — November 11, 2026
+
+- Follow the iPad's whiteboard viewport, including panning and zooming, with bounded presence updates and screen-size adaptation.
+- Preserve active Pencil strokes during AI reads; ask for a fresh read if the board changes during capture.
+- Yield between screenshot-rendering batches and encode PNGs asynchronously to reduce input blocking. Physical iPad freeze resolution remains to be verified.
+- Expand the README to cover drawing controls, library/page management, native file sharing, recovery and AI review workflows.
+
 ## Unreleased — November 11, 2026
 
 - Add the optional Swift iPad wrapper with Apple Pencil double-tap, native file sharing, app icon, and connection recovery.

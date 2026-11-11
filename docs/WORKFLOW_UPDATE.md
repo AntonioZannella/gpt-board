@@ -14,12 +14,14 @@ The iPad remains a client of the Mac server. No offline startup or separate iPad
 ## Sync and app behavior
 
 - Throttled live ink previews travel separately from completed-stroke saves. They are never written to the notebook, are dropped under queue pressure, disappear when the durable shape arrives, and expire after six seconds if abandoned. Recovery and review reads continue using the authoritative saved data.
-- Existing lazy page images, adjacent-page preloading, fast completed-stroke save, stationary-pointer swipe handling and iPad-follow behavior are retained.
+- Existing lazy page images, adjacent-page preloading, fast completed-stroke save, stationary-pointer swipe handling and iPad-follow behavior are retained. Follow mode also publishes the whiteboard viewport, so the Mac tracks iPad pan/zoom rather than just page changes.
 - The toolbar-free native app supports JavaScript rename/confirmation dialogs and PDF/image/JSON document opening from Files/share actions (native handoff limit 16 MiB; larger JSON backups use the web Files picker).
 - Failed initial loads retry while the app is active. An already-loaded board is never automatically reloaded by this retry path, preserving unsent writing. The failure-only connection prompt discovers the Mac using Bonjour where the Wi-Fi permits multicast. Discovery does not bypass per-device pairing. Numeric address entry remains available for networks blocking discovery.
 - `python3 scripts/update_ipad.py` lists devices; rerun with `--device IDENTIFIER` to build, replace the installed bundle and launch. This does not delete app data or bypass Apple's Personal Team signing expiration.
 
-## Verification
+## Verification at the original workflow update
+
+For current results, see [the verification record](RELEASE_TESTS.md) and GitHub Actions. The counts below describe the original workflow update.
 
 - 103 Python regression tests passed; 59 JavaScript tests passed and one optional external MLS integration test was skipped.
 - Added targeted tests for page/ink preservation, stale replacement rejection, exports above 50 pages, incomplete-export rejection, AI pen preview/approval/undo, live-preview isolation and page ranges.
