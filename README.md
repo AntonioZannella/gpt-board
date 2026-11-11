@@ -1,3 +1,5 @@
+<img src="ios/GPTBoardPad/Assets.xcassets/AppIcon.appiconset/AppIcon.png" alt="GPT Board app icon" width="128" height="128">
+
 # GPT Board
 
 [![CI](https://github.com/AntonioZannella/gpt-board/actions/workflows/ci.yml/badge.svg)](https://github.com/AntonioZannella/gpt-board/actions/workflows/ci.yml)
