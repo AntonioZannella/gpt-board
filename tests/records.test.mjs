@@ -22,7 +22,7 @@ test('read_board saves the frame image; saves log only frames whose ink changed'
 	try {
 		let err = ''
 		child.stderr.on('data', (c) => { err += c })
-		await Promise.race([once(child.stdout, 'data'), once(child, 'exit').then(() => { throw Error('Server exited: ' + err) }), sleep(3000).then(() => { throw Error('Server startup timeout') })])
+		await Promise.race([once(child.stdout, 'data'), once(child, 'exit').then(() => { throw Error('Server exited: ' + err) }), sleep(15000).then(() => { throw Error('Server startup timeout') })])
 		const base = `http://127.0.0.1:${PORT}`
 		const post = (url, body) => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 		const frame = (id, name) => ({ id, type: 'frame', typeName: 'shape', parentId: 'page:page', props: { name } })

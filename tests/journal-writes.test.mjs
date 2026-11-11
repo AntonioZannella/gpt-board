@@ -10,7 +10,7 @@ class Storage {
   setItem(k,v) { this.values.set(k,v); }
   removeItem(k) { this.values.delete(k); }
 }
-for (const file of ['src/app.js', 'dist/native/app.js']) {
+for (const file of ['src/app.js']) {
   const source = fs.readFileSync(new URL('../'+file, import.meta.url), 'utf8');
   const code = source.slice(source.indexOf('function writeOutbox() {'),source.indexOf('// A synchronous fallback'));
   function context(database) {

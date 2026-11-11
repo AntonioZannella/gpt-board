@@ -70,7 +70,7 @@ def run(engine, artifacts, source=SOURCE):
                 context.tracing.start(screenshots=True, snapshots=True, sources=True)
                 page = context.new_page()
                 errors = []
-                page.on("pageerror", lambda e: errors.append(str(e)))
+                page.on("pageerror", lambda e: errors.append(str(e) + "\n" + (e.stack or "")))
 
                 def api(path, body=None):
                     response = (
@@ -175,7 +175,7 @@ def run(engine, artifacts, source=SOURCE):
                 page.close()
                 other.close()
                 page = context.new_page()
-                page.on("pageerror", lambda e: errors.append(str(e)))
+                page.on("pageerror", lambda e: errors.append(str(e) + "\n" + (e.stack or "")))
                 page.goto(base)
                 saved(page)
                 assert ink_count() == before + 1, (
@@ -249,11 +249,14 @@ def run(engine, artifacts, source=SOURCE):
                 assert student["id"] in api("/api/board")["store"]
                 page.locator("#close-manage").click()
                 more_action(page, "#ai-panel")
-                page.get_by_role("button", name="Approve these exact changes").click()
+                operation = page.locator(".manage-row").filter(
+                    has=page.get_by_text("browser-approval", exact=True)
+                )
+                operation.get_by_role("button", name="Approve these exact changes").click()
+                expect(operation.get_by_role("heading", name="committed", exact=True)).to_be_visible()
                 assert student["id"] not in api("/api/board")["store"]
-                page.get_by_role(
-                    "button", name="Undo this AI edit", exact=True
-                ).first.click()
+                operation.get_by_role("button", name="Undo this AI edit", exact=True).click()
+                expect(operation.get_by_role("heading", name="undone", exact=True)).to_be_visible()
                 assert student["id"] in api("/api/board")["store"]
                 page.locator("#close-manage").click()
                 # Hiding the annotation layer changes rendering without deleting records.
@@ -315,7 +318,7 @@ def run(engine, artifacts, source=SOURCE):
                     )
                     restricted.add_init_script(script + ";Object.defineProperty(window,'indexedDB',{value:undefined})")
                     tab = restricted.new_page()
-                    tab.on("pageerror", lambda e: errors.append(str(e)))
+                    tab.on("pageerror", lambda e: errors.append(str(e) + "\n" + (e.stack or "")))
                     tab.goto(base)
                     saved(tab)
                     tab.route("**/api/board", refuse_save)

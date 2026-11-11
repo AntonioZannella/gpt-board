@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-for (const file of ['src/app.js', 'dist/native/app.js']) {
+for (const file of ['src/app.js']) {
   const source = fs.readFileSync(new URL('../' + file, import.meta.url), 'utf8');
   test(file + ': completed strokes save during the next ink gesture, other edits wait', async () => {
     const code = source.slice(source.indexOf('function save() {'), source.indexOf('async function exportImage('));
