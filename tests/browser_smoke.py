@@ -70,7 +70,30 @@ def run(engine, artifacts, source=SOURCE):
                 context.tracing.start(screenshots=True, snapshots=True, sources=True)
                 page = context.new_page()
                 errors = []
-                page.on("pageerror", lambda e: errors.append(str(e) + "\n" + (e.stack or "")))
+                tearing_down = set()
+                teardown_diagnostics = []
+
+                def watch_errors(tab):
+                    def report(error):
+                        detail = str(error) + "\n" + (error.stack or "")
+                        # WebKit reports a caught same-origin fetch cancellation
+                        # as pageerror during document replacement (Playwright #43120).
+                        if (engine == "webkit" and tab in tearing_down
+                                and "Fetch API cannot load " + base + "/api/board?shapes=1&" in detail
+                                and "due to access control checks." in detail):
+                            teardown_diagnostics.append(detail)
+                        else:
+                            errors.append(detail)
+                    tab.on("pageerror", report)
+
+                def reload_page(tab):
+                    tearing_down.add(tab)
+                    try:
+                        tab.reload()
+                    finally:
+                        tearing_down.discard(tab)
+
+                watch_errors(page)
 
                 def api(path, body=None):
                     response = (
@@ -125,7 +148,7 @@ def run(engine, artifacts, source=SOURCE):
                 draw(page)
                 saved(page)
                 assert ink_count() == 1
-                page.reload()
+                reload_page(page)
                 saved(page)
                 assert ink_count() == 1
                 page.locator("#undo").click() if page.locator(
@@ -169,13 +192,14 @@ def run(engine, artifacts, source=SOURCE):
                 draw(page, 75)
                 expect(page.locator("#status")).to_contain_text("kept on this device", timeout=10000)
                 assert ink_count() == before
-                other.reload()
+                reload_page(other)
                 saved(other)
                 assert ink_count() == before, "live journal must not be stolen"
+                tearing_down.add(page)
                 page.close()
                 other.close()
                 page = context.new_page()
-                page.on("pageerror", lambda e: errors.append(str(e) + "\n" + (e.stack or "")))
+                watch_errors(page)
                 page.goto(base)
                 saved(page)
                 assert ink_count() == before + 1, (
@@ -188,7 +212,7 @@ def run(engine, artifacts, source=SOURCE):
                 saved(second)
                 draw(second, 20)
                 saved(second)
-                page.reload()
+                reload_page(page)
                 saved(page)
                 assert ink_count() == before + 2
                 # Explicit page targeting, durable operation receipt, protected material proposal.
@@ -214,7 +238,7 @@ def run(engine, artifacts, source=SOURCE):
                     tool("add_shapes", args)["content"][0]["text"]
                 )
                 page.locator("#close-manage").click()
-                page.reload()
+                reload_page(page)
                 saved(page)
                 more_action(page, "#ai-panel")
                 expect(page.get_by_label("Annotation text").filter()).not_to_have_count(
@@ -318,7 +342,7 @@ def run(engine, artifacts, source=SOURCE):
                     )
                     restricted.add_init_script(script + ";Object.defineProperty(window,'indexedDB',{value:undefined})")
                     tab = restricted.new_page()
-                    tab.on("pageerror", lambda e: errors.append(str(e) + "\n" + (e.stack or "")))
+                    watch_errors(tab)
                     tab.goto(base)
                     saved(tab)
                     tab.route("**/api/board", refuse_save)
@@ -331,6 +355,7 @@ def run(engine, artifacts, source=SOURCE):
                     )
                     tab.unroute("**/api/board", refuse_save)
                     saved(tab)
+                    tearing_down.add(tab)
                     restricted.close()
                 # A restored edit conflicting with newer server state is retained,
                 # and the user can export the local version to a separate notebook.
@@ -368,7 +393,7 @@ def run(engine, artifacts, source=SOURCE):
                         ],
                     },
                 )
-                page.reload()
+                reload_page(page)
                 saved(page)
                 assert api("/api/board")["store"][student["id"]]["x"] == remote["x"]
                 more_action(page, "#recovery")
@@ -390,6 +415,7 @@ def run(engine, artifacts, source=SOURCE):
                             "engine": engine,
                             "status": "passed",
                             "first_open_ms": round(open_ms, 1),
+                            "teardown_diagnostics": teardown_diagnostics,
                             "workflows": [
                                 "draw/save/reload",
                                 "undo/redo",

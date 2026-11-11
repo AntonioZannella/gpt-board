@@ -2,6 +2,7 @@
 
 import threading
 from http.server import ThreadingHTTPServer
+from socketserver import TCPServer
 
 
 class BoundedHTTPServer(ThreadingHTTPServer):
@@ -11,6 +12,12 @@ class BoundedHTTPServer(ThreadingHTTPServer):
     def __init__(self, *args, **kwargs):
         self.slots = threading.BoundedSemaphore(64)
         super().__init__(*args, **kwargs)
+
+    def server_bind(self):
+        # HTTPServer resolves a reverse-DNS name here. These local servers use
+        # explicit origins/Host validation and never need that blocking lookup.
+        TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
 
     def process_request(self, request, client_address):
         if not self.slots.acquire(blocking=False):
