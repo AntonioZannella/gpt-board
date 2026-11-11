@@ -1,0 +1,2 @@
+// Set your team in the ignored Signing.local.xcconfig file.
+#include? "Signing.local.xcconfig"

@@ -1,221 +1,94 @@
-# GPT Board: details
+# GPT Board: implementation details
 
-These sections moved here from the [README](../README.md).
-
-## Validation and limits
-
-Verified: imports of 502 existing stroke segments; drawing, box selection, batch deletion/Undo, partial erasing, pinch bounds/reversal, exact refresh restoration; GPT add/update/delete, PNG overview export, and exact-frame region export. Server persistence and review integration use the existing backend.
-
-This is the first independent implementation, not an exact recreation of every tldraw feature. Text layout and geometric shapes use our renderer; arrows created through GPT have fixed endpoints rather than live attachment constraints. Interactive shape rotation/resizing and rich-text editing are not included. Physical Apple Pencil/iPad behavior still needs device validation; desktop and simulated-touch checks cannot replace that.
-
-The previous frontend source, package files, tests, build, and a snapshot of notebook JSON are retained under `code-backups/before-native-engine-*`. Installed old dependencies can remain on disk, but are not referenced by the new build. Never overwrite newer notebook data as part of a code-only rollback.
-
-## Python migration validation and rollback
-
-Eight Python tests cover concurrent collection creation, atomic-save failure recovery, legacy-compatible review identity, session backup/validation, frontend builds, iPad large saves and live operation acknowledgements, disconnected tabs, and route restrictions. Six existing JavaScript drawing/client tests run against the Python services, including isolated real-controller review logging and the iPad frontend-asset regression. All test data and synthetic reviews use temporary directories.
-
-Before installing, browser checks verified drawing, Python autosave, reload persistence, and an existing PDF notebook using copied data. The previous backend and command files are retained under `code-backups/before-python-backend-*`. For a rollback, stop the Python services, restore the backed-up code files and run the old Node server and iPad bridge. Never restore older notebook data over new writing as part of a code rollback.
-
-## Smooth ink update
-
-Live strokes use a transparent canvas above the static page. Raw/coalesced samples remain in memory until release, then are packed once; the page is not repainted on every pen move. Cached, pressure-filtered curved outlines replace overlapping straight line segments. Stroke history stores an added stroke instead of cloning every page at pen-down. Empty coalesced batches, short down/up dashes, capture loss, cancellation, and a missed initial down with confirmed pen contact are handled; hover never starts ink.
-
-Autosave waits for an idle moment and sends shape changes. Python validates and merges those changes under the storage lock, preserving schema, PDF assets, and untouched records before the existing atomic write. Existing full-snapshot clients remain compatible. Browser input/rendering stay JavaScript for low latency; merge, persistence, services, build, and the audit launcher are Python.
-
-At the time of the smooth ink update, `python3 test.py` ran nine Python checks and eight JavaScript checks. See the README for the current test command. `python3 tests/browser_ink_audit.py` starts an isolated, disposable browser fixture on localhost:8796. Open its printed URL and press **Run ink regression checks**. The browser audit covers 108 rapid/interrupted strokes, endpoints, hover/palm exclusion, undo/redo, select/delete/undo, save/read-back, zero static-layer repaints during a long stroke, and exclusion of a 3 MB asset from save payloads. It never edits real notebooks. Physical Pencil timing still needs confirmation on the iPad.
-
-For this update, code backups are under `code-backups/before-smooth-ink-*`. Restore code only, rebuild with Python, and restart the server if rolling back; never replace current notebook data with an older copy.
-
-## Single-page notebooks and Safari input repair
-
-Notebooks show one sheet at a time. Swipe left for the next page and right for
-the previous page; the page picker, arrow buttons, and Page Up/Page Down keys
-also work. Fit page shows the whole sheet. Pinch to zoom and drag to move within
-the sheet; when zoomed, a horizontal swipe at the corresponding page edge turns
-the page. Whiteboards remain infinite canvases. Existing page IDs, positions in
-storage, PDF images, handwriting, and exact-frame AI exports are preserved.
-
-The app saves the current page, position, and zoom immediately as the camera
-changes. Startup reads that saved view before fitting the canvas. Zero-size
-background layouts are ignored, and legacy views can restore even if their old
-frame ID is unavailable. Views remain specific to the browser and site address.
-
-Safari cannot select toolbar/status text while writing. Canvas touch handlers
-prevent default browser gestures, and explicitly identified stylus Touch Events
-provide a fallback when the pointer stream is absent. Mixed touch/pointer
-streams are deduplicated, fingers still pan/pinch, and pen pressure can recover
-a missing pointer-down without relying on the buttons bit. Browser-local input
-and rendering remain JavaScript to avoid network latency.
-
-For disposable browser checks, run `python3 tests/browser_ink_audit.py` for
-whiteboards, or `python3 tests/browser_ink_audit.py --port 8797 --notebook` for
-notebook input, page swipes, legacy view migration, hidden/resize layout, and
-reload restoration. Use the printed URL. These tests do not replace physical
-iPad/Pencil validation.
-
-## Page reload fallback and swipe motion
-
-The notebook URL now includes the current frame ID in a `page` parameter.
-Reload restores that page even if browser storage is unavailable or contains an
-older page. Zoom and pan still use browser storage. The address changes only
-when the selected page changes, avoiding per-frame history writes on Safari.
-An invalid or removed page ID falls back to the saved view or first page.
-
-A horizontal page swipe follows the finger and previews the adjacent sheet.
-Release slides to the destination; short or canceled swipes return to the current
-page, and the first/last page provides restrained edge resistance. Page buttons
-and the page picker animate too. Pinch, resize, or a new Pencil contact cancels
-the visual transition immediately. Reduced-motion preferences disable settling
-animation. These temporary canvas layers never alter notebook content or frame
-coordinates and never receive pointer events.
-
-## Project history
-
-The public repository starts with a snapshot committed on November 5, 2026. The project already existed before that snapshot, so this history does not show every earlier implementation step. References to existing notebooks and the previous frontend describe that earlier personal installation.
-
-## Active-tab routing
-
-The Python server prefers the tab that saved most recently. If that tab is not connected, it falls back to another registered tab; it does not guarantee delivery only to the last-saving tab. Tabs using the legacy connection identifier are excluded from the operation registry, and saves without a tab identifier receive HTTP 409 with a reload message.
-
-This behavior is visible in the [initial public server snapshot](https://github.com/AntonioZannella/gpt-board/blob/57b0dcf884c89ec0c9f10b080f78fe815e848f38/server.py), in `BoardApp.send_to_tab`, the save handler, and the event-stream registration. The public history does not isolate the original fix as a separate commit.
-
-## Architecture
-
-- **Browser board:** a Canvas 2D frontend handles drawing, handwriting input, page navigation and rendering locally in the browser. It saves edits through HTTP requests to the Python server.
-- **Python server:** a Python standard-library backend serves the board, persists notebooks and whiteboards, and exposes the MCP tools. Server-sent events (SSE) deliver operations to the active board tab; the tab returns results through HTTP requests.
-- **MCP client:** a connected AI client requests board images or calls drawing tools through the server. Reading and drawing require an open board tab. Review recording also depends on a separately configured Math Learning System.
-- **Optional iPad bridge:** a paired Python Wi-Fi proxy connects an iPad browser to the same board server. It forwards the board routes and event stream, but does not expose the MCP endpoint.
-
-## MCP tools
-
-These are the tools declared in `mcp_schema.json` and handled by the Python server:
-
-| Tool | What it does |
-| --- | --- |
-| `read_board` | Returns a fresh image of an exact page frame, lists frames when no frame is supplied, or reads an explicit whole-board overview. |
-| `add_shapes` | Adds shapes, text, sticky notes or arrows, with optional automatic placement. |
-| `update_shapes` | Moves, resizes, recolors or edits existing shapes by ID, changing only the supplied fields. |
-| `delete_shapes` | Deletes shapes by ID; tool instructions restrict deletion to AI-created shapes unless the user asks otherwise. |
-| `record_review` | Saves one checked problem, including correct or unresolved results, with fresh exact-frame evidence to the configured Math Learning System and error log. |
-
-## Trade-offs
-
-- **Standard library only:** nothing to install beyond Python to run the backend, and I wanted to learn Python itself rather than a framework. Browser drawing and input stay in JavaScript.
-- **SSE over WebSockets:** the server only needs to push edits one way to the board tab; the tab sends its responses over HTTP. SSE runs over plain HTTP, the browser reconnects on its own, and Python's standard library has no WebSocket support.
-- **MCP:** it is a standard protocol, so compatible AI clients, such as Codex or Claude, can read and draw on the board through the same tools without custom board code for each client. Each client still needs an MCP connection configured for this server.
-
-## Using the existing installation
-
-Open <http://localhost:8787> on the computer running GPT Board. On the iPad, use your existing paired board address. Existing launch commands are listed below; if the services are already running, keep using them without launching another copy.
-
-Choose **Notebooks** for paged material or **Whiteboards** for an infinite canvas. Select a saved board from the picker, or use **New**. Write with Pencil or mouse, use fingers to pan and pinch, and wait for **Saved** before closing. Use **Select** and **Delete selected** to remove selected writing; Undo restores it.
-
-## Implementation and existing commands
-
-The frontend is our own Canvas 2D engine. It has no tldraw, React, Vite, or other third-party runtime dependencies. The HTTP/MCP backend, iPad Wi-Fi bridge, persistence, build command, and session loader run on Python using only its standard library. Needs Python 3.11 or newer (uses datetime.UTC). Tested on 3.12.
+Current local candidate: **1.3.0rc1**. See the exact [60-item mapping](READINESS_CHECKLIST.md), [compatibility](COMPATIBILITY.md), and [recovery](RECOVERY.md).
 
 ## Run and build
 
-- `python3 build.py`: copies the frontend into `dist/` atomically.
-- `python3 server.py`: serves the board and GPT MCP connection on port 8787.
-- `python3 ipad_server.py`: starts the paired iPad bridge on the Mac’s Wi-Fi address, port 8788.
-- `SHOW_PAIRING_LINK=1 python3 ipad_server.py`: prints the private pairing URL when starting the bridge. Keep that URL private. Existing paired devices retain their cookie and token.
-- `python3 load_session.py 1`: loads an existing prebuilt session after backing up the previous default board. Close board tabs first, then reopen them. This utility does not start a tutoring-controller session.
-- `python3 -m unittest discover -s tests -p 'test_*.py' -v`: Python backend tests.
-- GitHub Actions (`../.github/workflows/ci.yml`) runs `ruff check` and `python test.py` on every push and pull request. It includes the JavaScript checks; the external-controller integration is skipped when `MLS_TEST_CONTROLLER` is unset.
-- `python3 test.py`: all Python tests plus the JavaScript drawing/client contract checks (Node needed only for those checks).
+`python3 board.py start` checks Python, health and frontend freshness before launching. It owns an OS file lock; main server and bridge also own locks, so competing launches cannot start a second writer against one installation. Child startup is probed before success is announced; termination cleans up children. The supervisor checks changed Wi-Fi addresses every 15 seconds. An orphaned bridge exits after three failed five-second upstream checks. A recognized running server is reported, never replaced. `stop` refuses open tabs.
 
-### Full-suite test prerequisite
+`PORT` changes the loopback port, `IPAD_PORT` the bridge port, and `IPAD_HOST` an explicitly selected local Wi-Fi bind address. Keep distinct installations in distinct directories. The `.js` launchers retain older command compatibility; Python is the implementation. `build.py` copies readable browser source without a JavaScript compilation framework.
 
-The review-log integration test needs the separate Math Learning System controller (`mls.py` and its imported code). Those files are not included in this repository, so the test is skipped, with the reason printed, unless `MLS_TEST_CONTROLLER` points to your installed controller:
+## Optional review configuration
 
-```bash
-MLS_TEST_CONTROLLER="$HOME/Downloads/claude code/Math Learning System/mls.py" python3 test.py
+Use existing initialized courses. Preserve private configuration during upgrades:
+
+```json
+{"review":{"controller":"/path/to/existing/Math Learning System/mls.py",
+  "python":"python3","courses":{"Exact course label":"/path/to/initialized/course"},
+  "max_evidence_bytes":536870912}}
 ```
 
-Adjust that path for your installation. The test creates a temporary course and error log and does not use your real course records. `MLS_TEST_PYTHON` selects the controller's Python interpreter if needed. The Python-only command above does not require this external controller; it is not a substitute for the full suite. The suite collects 22 Python tests and 8 JavaScript tests; one JavaScript integration test is skipped without the external controller.
+Save as private `data/config.json`. `MLS_CONTROLLER`, `MLS_PYTHON`, and `MLS_COURSES_JSON` can override the adapter settings. No personal course/path is a source default. The canonical controller remains responsible for recording, session/audit rules and the existing shared error log. Never point test fixtures at real course stores.
 
-The existing `npm start`, `npm run build`, `npm run ipad`, `npm run session -- 1`, and `npm test` commands also work; they invoke Python. The old JavaScript server/bridge/build/session entry points are small compatibility launchers, with no backend implementation remaining in JavaScript. Node is not needed to run the app with the Python commands.
+Each exact-page read archives actual PNG bytes with a SHA-256 hash, capture time, notebook, stable frame ID when returned, revision and optional slice. Recording verifies those bytes. `supersedes` changes an assessment with fresh evidence and a new review; `resolves` links a later successful retry, preserving help. Historical records are never silently pruned. At 512 MiB of evidence (configurable), archiving refuses new evidence and explains the limit. Preserve/export the archive before deliberately adjusting it.
 
-## Python backend
+The read-only history panel reads only `kind: board_review` records from the mapped canonical `attempts.jsonl`, with pagination and original correction links. It intentionally does not call the controller's `state`/`export` commands: those rebuild derived state and may append transition records. Due practice remains in the canonical study workflow because the current controller has no read-only due-practice query.
 
-- `server.py`: HTTP routes, server-sent events, active-tab operation routing, and MCP requests.
-- `board_storage.py`: notebook and whiteboard storage, atomic file replacement, collection metadata, and handwriting activity tracking.
-- `board_review.py`: exact-frame evidence archives, stable review IDs, validation, and calls to the existing canonical Math Learning System controller. It does not replace or hand-edit the learning ledger or error log.
-- `mcp_schema.json`: preserved GPT tool definitions and review instructions; configured courses are inserted at startup.
-- `ipad_server.py`: paired Wi-Fi proxy with the same allowed routes and authentication boundaries.
-- `build.py` and `load_session.py`: build and prebuilt-board loading utilities.
-- `usage.py`: the existing Python reporting utility.
+## Architecture
 
-The backend keeps the existing `data/` files, notebook IDs, tokens, port numbers, HTTP routes, and MCP tool schemas. `PORT`, `IPAD_HOST`, `IPAD_PORT`, `BOARD_PORT`, `MLS_CONTROLLER`, `MLS_PYTHON`, and `MLS_COURSES_JSON` remain supported. Review logging depends on an existing Math Learning System installation and initialized courses. The bundled defaults are installation-specific; configure explicit course mappings for your installation.
+```mermaid
+flowchart LR
+  B[Browser Canvas and input] --> J[Per-document recovery journal]
+  B --> S[Python HTTP server]
+  M[Local MCP client] --> S
+  S --> A[Validation and AI ownership]
+  A --> N[Atomic notebook and receipt snapshot]
+  N --> K[Rolling backups]
+  S --> E[Archived page evidence]
+  E --> C[Existing canonical learning controller]
+```
 
-PDF pages already imported into notebooks keep their original embedded images and frame records. Existing external PDF-generation scripts are not rewritten by this migration. Browser rendering and input remain JavaScript because they run inside Safari; native Pencil side-tap support would still require Swift.
+The browser draws immediately. The server validates saves; the notebook file owns committed content. The review adapter delegates recording to the already configured learning system.
 
-## Frontend
+| File | Responsibility |
+| --- | --- |
+| `build.py` | Copy frontend sources to generated `dist/`. |
+| `board.py`, `file_lock.py` | Startup/status/stop, maintenance commands, OS-owned process locks. |
+| `board_storage.py` | Authoritative snapshots, revisions, rolling backups, index recovery, portable notebook files. |
+| `validation.py` | Allowed record/shape kinds, dimensions, nested data, parent graphs, strokes and image boundaries. |
+| `server.py`, `http_body.py`, `http_limits.py` | HTTP/MCP/SSE routing, Origin/media checks, body deadlines and bounded connections. |
+| `ai_operations.py` | Stable operation receipts, provenance, user proposals, page placement and safe undo. |
+| `pairing.py`, `ipad_server.py` | One-use invitations, device sessions/revocation, paired forwarding and bridge lifecycle. |
+| `media.py`, `media_worker.py` | Temporary import jobs and bounded native-decoder processes; PDF generation. |
+| `board_review.py` | Evidence archive and narrow canonical-controller adapter. |
+| `src/model.js`, `src/app.js` | Stroke codec/transforms and browser-local Canvas input/rendering/history. |
+| `src/sync.js`, `src/recovery.js` | Three-way merge/status and independent browser journals. |
+| `src/pages.js`, `src/panels.js` | Stable page lifecycle and accessible management dialogs. |
 
-- `src/app.js`: canvas rendering, pointer input, camera, history, selection, erasing, local view persistence, autosave, and GPT operation bridge.
-- `src/model.js`: notebook interchange adapter, packed stroke codec, parent transforms, bounds, hit testing helpers, and partial-stroke cutting.
-- `src/style.css` and `src/index.html`: the native UI.
+Browser input remains JavaScript to avoid network delay in handwriting. PDFium is used through pypdfium2 in separate short-lived Python processes because PDFium is not thread-safe. Pillow decodes PNG/JPEG, ReportLab writes raster PDF, and Segno generates pairing QR images. These established libraries are pinned in requirements files. Core drawing still has no third-party runtime dependency. Reference APIs: [pypdfium2](https://pypdfium2.readthedocs.io/en/stable/python_api.html), [Playwright Python](https://playwright.dev/python/docs/intro), [Segno](https://segno.readthedocs.io/en/stable/).
 
-Existing notebook records and image assets are read directly. Rendering and editing do not load the old drawing library. Keeping the existing JSON structure preserves notebook identities, frame IDs, and the server's review evidence workflow. Existing records are preserved until edited; new strokes use the same interoperable packed-point representation.
+## Saving and AI protocol
 
-## Interaction
+`board.json` is the commit boundary. A save names its base revision; stale writes receive the current shapes and revision for three-way reconciliation. Independent shapes merge. Two different changes to one shape keep the saved server copy and preserve the local candidate separately. This is not character-level or stroke-point collaboration.
 
-Pencil/mouse writes. Finger gestures scroll and pinch; the Move page tool supports mouse panning. Select supports clicking and box selection, Shift to extend selection, and dragging selected items. Delete and Undo work on the whole selection. Eraser supports whole strokes or partial cuts. Printed page images and page frames remain protected during selection and erasing. Keyboard shortcuts: Delete/Backspace, Cmd/Ctrl+Z, Shift+Cmd/Ctrl+Z, and Cmd/Ctrl+A.
+The local journal prefix is `gpt-board:journal:v2:`. Each new document has a new tab identity. BroadcastChannel probes keep active tabs from consuming each other's journals. Without that API, recent journals wait 30 seconds before recovery. Removal uses compare-before-delete, so a changed journal is not erased. Unrecognized/damaged browser data is retained. A local-storage write is an acceptance by the browser, not a guarantee against storage eviction or power failure. The interrupted portion of a currently unfinished stroke is outside the completed-edit guarantee.
 
-The view is saved per notebook in browser local storage. Existing saved views from the previous frontend migrate on first open. Autosave runs after edits settle; save failures retry. Wait for “Saved” before closing. The browser warns if a save is still pending. Image decoding is limited to a small cache so long notebooks do not retain all page bitmaps in memory.
+AI mutation receipts are in the same atomic snapshot as their shapes. Caller operation IDs bind to a request hash. Lost responses, browser restarts and server restarts do not reapply an operation with the same ID/payload. A proposal to edit non-AI material binds to the exact store hash and expires after ten minutes. A UI approval that finds changed content refuses and asks for a fresh proposal. Page/image/locked-shape edits remain forbidden. Undo compares post-operation records before restoring old records; it refuses if somebody subsequently changed them. Restore carries current receipt history forward as `reverted_by_restore` to prevent old retries resurrecting content.
 
-## Whiteboards
+Reads still need a connected rendering tab. Stable page IDs or unique names are accepted; duplicate names fail. A deliberately selected target that disconnects is refused. Without selection or explicit notebook, legacy read routing retains the last notebook and never falls back to a different one. Editing requires explicit notebook/frame or a UI-selected target. Read acknowledgements retry without blocking later requests. They cannot roll back saved AI edits because mutation no longer depends on browser acknowledgement.
 
-Use the Whiteboards tab beside Notebooks for separate saved infinite canvases. New opens a name dialog; the picker switches among saved whiteboards. Both collections use the native pen, highlighter, eraser, selection/delete, and history tools. Whiteboards pan freely in all directions, zoom from 10–800%, and show a faint dot grid. Fit drawing brings the content into view; Reset view returns to the origin at 100%. Each board remembers its own view, and each collection remembers the last board opened on this device.
+## Interaction and practical limits
 
-Collection metadata uses `kind: "whiteboard"` in `data/notebooks.json`; existing records with no kind remain notebooks. IDs are unique across both collections; snapshots continue using the existing per-ID storage and GPT protocol. `GET /api/notebooks` returns notebooks; `?kind=whiteboard` returns whiteboards. Creating a whiteboard sends `kind: "whiteboard"` to the existing create endpoint. The URL includes `section=whiteboards`. No existing notebook data is migrated or relabeled.
+Single-page notebooks retain pressure-aware ink, finger pan/pinch, partial erasing, page swipes, reduced motion and remembered notebook/page/view. Shape/page IDs survive rename and reorder; duplication remaps descendants. Trash marks frame metadata without deleting its records/assets. Notebook archive/trash changes only index metadata. Historical review evidence is unchanged by all of these operations.
 
-Verified collection separation, colliding names, independent saves, drawing/panning, board switching, and pixel-identical canvas restoration after refresh. Actual iPad gestures still require device validation.
+Import stages at most two jobs for one hour, with 16 MiB input, 25 PDF pages, bounded native workers and a 32 MiB rendered-job limit. No notebook is changed until commit. Cancellation before commit discards staging; an in-progress decoder may take up to its 30-second process deadline to exit. Once commit has succeeded, cancellation is not a rollback—use page Trash or a backup. Image imports become embedded PNG assets. Notebook files preserve internal IDs but receive a new notebook ID; imported AI ownership and operation receipts are not trusted.
 
-## Resume the last notebook
+PDF export renders pages sequentially, up to 50 pages and 48 MiB output. The longest side is 2400 pixels (PNG download: 3000); the page aspect ratio is preserved. The same annotation layout wraps long words, fits type to the box, and uses an ellipsis at the minimum size if necessary; the full stored text remains in the readable panel. Raster quality depends on original imported images and ink size. Printing, font appearance and physical paper output still need user inspection. JSON export is the complete portable notebook option when PDF limits are reached.
 
-Opening the main board address resumes the last successfully opened notebook
-or whiteboard. A small first-party cookie backs up the selected board ID and
-collection if browser local storage is unavailable. The cookie is separated by
-port for local installations and contains no notebook content or connection
-tokens. Changing tools or drawing does not repeatedly write this preference.
+## Tests and support matrix
 
-Specific links containing `?notebook=...` still open the named notebook. Use the
-main address without a notebook query for a bookmark that should resume your
-last board. Empty notebooks also keep their ID in the address when reloaded.
+See [COMPATIBILITY.md](COMPATIBILITY.md) for actual platform evidence. `test.py` runs Python tests and Node contracts; `tests/browser_smoke.py` orchestrates an isolated source installation and Chromium/WebKit. Screenshots, trace, synthetic video, downloads and logs go to `browser-artifacts/`. CI uploads them even on failure. No test uses personal notebooks or course logs.
 
-`python3 tests/browser_resume_audit.py` provides disposable multi-notebook checks
-for switching, reload, reopening the main address, changing collections, and
-browser-storage failure.
+`MLS_TEST_CONTROLLER=/path/to/mls.py .venv/bin/python test.py` enables the real-controller fixture. Without that variable, exactly one external-controller test skips. The self-contained correction-chain oracle has a test-only sentinel and is not a replacement learning ledger.
 
-## iPad Home Screen launches
+## Code to study and bounded personal improvements
 
-A fresh launch in standalone/Home Screen mode resumes the last successfully
-opened notebook or whiteboard, even if the icon was originally saved with a
-specific notebook URL. The last page ID is also included in the small session
-cookie. Deliberate in-app notebook/collection choices carry a one-shot `open=1`
-flag, removed after loading, so resuming cannot override those choices. Normal
-browser links, refreshes, and history navigation retain their explicit target.
-The resume browser fixture simulates standalone launches with an older icon
-address, including disabled local storage; physical iPad testing remains needed.
+1. Read `build.py`, then trace a saved stroke through `save_changes` in `board_storage.py`. Explain why a revision mismatch returns before writing.
+2. Trace `AIOperations.execute`: stable identity, provenance, proposal binding, one-file commit, retry. Explain why an HTTP response can be lost after the save succeeded.
+3. Follow a fresh image through `ReviewService.archive`, `payload` and `record`; explain why a returned receipt matters.
 
-## Python and JavaScript files
+Small contributions Antonio can choose and explain: add an accessible keyboard shortcut for opening Files; add a new malformed-stroke regression with a before/after explanation; improve one recovery message after a real Pencil test. These are candidates, not claims that Antonio already implemented them.
 
-| Python file | JavaScript counterpart | Why both exist |
-| --- | --- | --- |
-| `server.py` | `server.js` | Python implements HTTP, SSE, and MCP; JavaScript preserves the old launch command by starting Python. |
-| `ipad_server.py` | `ipad-server.js` | Python implements the paired bridge; JavaScript preserves the old launch command by starting Python. |
-| `load_session.py` | `load-session.js` | Python loads an existing prebuilt session; JavaScript forwards the old command and its arguments. |
-| `build.py` | `build-native.mjs` | Python copies frontend files into `dist/`; JavaScript forwards the old build entry point. |
-| `board_storage.py` | None | Notebook persistence and atomic saves are implemented only in Python. |
-| `board_review.py` | None | Evidence validation and the external review-controller bridge are implemented only in Python. |
-| `http_body.py` | None | Request-body parsing, size limits, and read deadlines are implemented only in Python. |
-| `test.py` | None | Python runs the Python and Node test commands; `npm test` calls this runner through `package.json`. |
-| `usage.py` | None | This separate Python utility reports local Codex session usage and is not part of the browser app. |
-| `tests/test_audit.py` | None | Python tests backend security and protocol boundaries; the Node tests are complementary checks, not launchers for this file. |
-| `tests/test_python.py` | None | Python tests storage, builds, sessions, and live protocol behavior; the Node tests are separate checks. |
-| `tests/browser_ink_audit.py` | `tests/browser_ink_audit.js`, `tests/browser_notebook_audit.js` | Python serves a disposable fixture and selects the mode; JavaScript drives and checks the browser interactions. |
-| `tests/browser_resume_audit.py` | `tests/browser_resume_audit.js` | Python serves disposable notebooks; JavaScript checks navigation, reloads, and storage fallback in the browser. |
+## Project history
 
-`src/app.js` and `src/model.js` implement browser input, drawing, and geometry. They are not copies of the Python backend. The four compatibility launchers forward arguments, use `BOARD_PYTHON` or `python3`, and pass process signals to the Python child.
+The public repository began with a snapshot on November 5, 2026, after earlier personal development. Earlier test counts and historical 1.2.0 activation notes describe those earlier stages. Current changes remain uncommitted. Do not roll back notebook data when rolling back code.

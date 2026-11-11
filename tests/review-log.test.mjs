@@ -25,7 +25,7 @@ test('real controller: MCP reviews preserve evidence, record distinct errors, an
     const connection = new AbortController()
     try {
         await fs.copyFile(path.join(root, 'server.py'), path.join(tmp, 'server.py'))
-        for(const support of ["board_storage.py", "board_review.py", "http_body.py", "mcp_schema.json"]) await fs.copyFile(new URL(support, new URL('../',import.meta.url)),path.join(tmp,support));
+        for(const support of ["board_storage.py", "board_review.py", "http_body.py", "pairing.py", "validation.py", "ai_operations.py", "file_lock.py", "http_limits.py", "media.py", "media_worker.py", "browser_snapshot.py", "mcp_schema.json"]) await fs.copyFile(new URL(support, new URL('../',import.meta.url)),path.join(tmp,support));
  await fs.writeFile(path.join(tmp, 'package.json'), '{"type":"module"}')
         await fs.writeFile(errorLog, '# Isolated test error log\n')
         execFileSync(python, [controller, '--dir', courseDir, 'init', '--course', 'Calc 3', '--error-log', errorLog], { stdio: 'pipe' })
@@ -142,6 +142,19 @@ test('real controller: MCP reviews preserve evidence, record distinct errors, an
         assert.match(log, /Hessian determinant/)
         assert.match(log, /Multiplication gives six/)
         assert.match(log, /Final symbol unreadable/)
+        const repairRead = await read()
+        const repaired = parsed(await call('record_review', { ...baseReview, check_id: repairRead.check_id, assistance: 'helped',
+            resolves: [{ review_id: wrong.review_id, error_id: 'e1', reason: 'Synthetic fresh variation checked' }] }))
+        assert.equal(repaired.status, 'saved')
+        assert.match(await fs.readFile(errorLog, 'utf8'), /FIXED/)
+        const correctionRead = await read()
+        const corrected = parsed(await call('record_review', { ...baseReview, check_id: correctionRead.check_id, result: 'unresolved', read_confidence: 'low',
+            supersedes: { review_id: repaired.review_id, reason: 'Synthetic recognition correction' } }))
+        assert.equal(corrected.status, 'saved')
+        records = await rows()
+        assert.equal(records.length, 5)
+        assert.equal(records[3].assistance, 'helped')
+        assert.equal(records[4].supersedes.review_id, repaired.review_id)
         const events = await fs.readFile(path.join(courseDir, 'events.jsonl'), 'utf8').catch(() => '')
         assert.ok(!events.split('\n').filter(Boolean).map(JSON.parse).some(event => event.cmd === 'start'), 'reviews never silently create a tutoring session')
     } finally {

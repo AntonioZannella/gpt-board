@@ -1,0 +1,27 @@
+name: Reproducible bug
+description: Use synthetic writing; never attach private notebook data or secrets.
+title: ''
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: 'For security-sensitive reports, use SECURITY.md. Do not post tokens, pairing links, private handwriting or course logs.'
+  - type: textarea
+    id: environment
+    attributes:
+      label: Version and environment
+      description: App version, OS/browser/Python, Mac or iPad/Pencil model if relevant; no private addresses.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps using synthetic data
+      description: What you did, expected behavior and actual result. Include save/connection status.
+    validations:
+      required: true
+  - type: textarea
+    id: recovery
+    attributes:
+      label: Recovery and evidence
+      description: Did Save/reload/reconnect recover the work? Attach only sanitized screenshots or disposable-test traces.

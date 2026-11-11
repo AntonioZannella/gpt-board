@@ -1,0 +1,42 @@
+{
+  "platform": "macOS-26.5.1-arm64-arm-64bit",
+  "python": "3.12.0",
+  "browser": "158.0.8127.18",
+  "workloads": [
+    {
+      "strokes_at_open": 100,
+      "payload_bytes": 62123,
+      "first_open_and_two_frames_ms": 402.0,
+      "idle_frame_p95_ms": 16.8,
+      "js_heap_bytes": 3628392,
+      "30_synthetic_strokes_and_save_ms": 7839.6
+    },
+    {
+      "strokes_at_open": 1000,
+      "payload_bytes": 621824,
+      "first_open_and_two_frames_ms": 329.4,
+      "idle_frame_p95_ms": 16.8,
+      "js_heap_bytes": 10113820,
+      "30_synthetic_strokes_and_save_ms": 7813.8
+    },
+    {
+      "strokes_at_open": 10000,
+      "payload_bytes": 6245834,
+      "first_open_and_two_frames_ms": 829.9,
+      "idle_frame_p95_ms": 16.8,
+      "js_heap_bytes": 43777696,
+      "30_synthetic_strokes_and_save_ms": 8788.8
+    }
+  ],
+  "sustained_session": {
+    "starting_strokes": 10030,
+    "added_strokes": 600,
+    "elapsed_ms": 141437.6,
+    "js_heap_start_bytes": 34690664,
+    "js_heap_end_bytes": 46466668,
+    "blocked_save_strokes": 10,
+    "reconnect_until_saved_ms": 1795.5,
+    "verified_final_strokes": 10640
+  },
+  "limits": "One run per workload; Chromium CDP JS heap and idle rAF intervals, not input latency, physical Pencil or long-session certification. No baseline speedup comparison."
+}

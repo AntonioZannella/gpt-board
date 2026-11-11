@@ -19,9 +19,10 @@ class LaunchTests(unittest.TestCase):
             self.assertIsNone(launch_options([]).lan)
             self.assertEqual(launch_options([]).port, 8787)
             self.assertEqual(launch_options(['--port', '8788']).port, 8788)
-            self.assertEqual(launch_options(['--lan', '10.0.0.8']).lan, '10.0.0.8')
-            with patch('ipad_server.wifi_host', return_value='10.0.0.9'):
-                self.assertEqual(launch_options(['--lan']).lan, '10.0.0.9')
+            # Direct LAN mode had no authentication; it now refuses to start.
+            for argv in (['--lan'], ['--lan', '10.0.0.8']):
+                with self.assertRaises(SystemExit), patch('sys.stderr'):
+                    launch_options(argv)
         with tempfile.TemporaryDirectory() as root:
             self.assertEqual(BoardApp(root).allowed_hosts, {'localhost', '127.0.0.1'})
 
@@ -47,7 +48,7 @@ class HTTPTests(unittest.TestCase):
     def request(self, path, body=b'', headers=None):
         conn = http.client.HTTPConnection('127.0.0.1', self.server.server_port, timeout=3)
         try:
-            conn.request('POST', path, body, headers or {})
+            conn.request('POST', path, body, {'Content-Type': 'application/json', **(headers or {})})
             response = conn.getresponse()
             return response.status, response.read()
         finally:
@@ -146,7 +147,7 @@ class HTTPTests(unittest.TestCase):
         messages = queue.Queue(maxsize=SSE_QUEUE_SIZE)
         for n in range(SSE_QUEUE_SIZE):
             messages.put_nowait({'n': n})
-        self.app.tabs['slow'] = {'queue': messages, 'notebook': 'default'}
+        self.app.tabs['slow'] = {'queue': messages, 'notebook': 'default', 'tab': 'slow'}
         started = time.monotonic()
         result = self.app.send_to_tab('add', {})
         self.assertFalse(result['ok'])
@@ -189,15 +190,16 @@ class HTTPTests(unittest.TestCase):
         original = self.app.storage.read('default')
         summary = {'shapeCount': 0}
         size = len(dumps(original).encode()) + len(dumps(summary).encode())
-        body = {'tab': 'test', 'snapshot': original, 'summary': summary}
+        body = {'tab': 'test', 'base': self.app.storage.revision('default'), 'snapshot': original, 'summary': summary}
         with patch('board_storage.MAX_BOARD_BYTES', size):
             self.assertEqual(self.request('/api/board', json.dumps(body))[0], 200)
             before = {p.name: p.read_bytes() for p in self.app.storage.data.glob('*.json')}
+            body['base'] = self.app.storage.revision('default')
             body['snapshot'] = empty_snapshot('Longer notebook title')
             self.assertEqual(self.request('/api/board', json.dumps(body))[0], 413)
             body.pop('snapshot')
             body['changes'] = {'put': [{'id': 'shape:large', 'typeName': 'shape',
-                                       'type': 'geo', 'props': {'text': 'x' * 100}}], 'remove': []}
+                                       'type': 'geo', 'parentId': 'page:page', 'props': {'text': 'x' * 100}}], 'remove': []}
             self.assertEqual(self.request('/api/board', json.dumps(body))[0], 413)
             after = {p.name: p.read_bytes() for p in self.app.storage.data.glob('*.json')}
             self.assertEqual(before, after)

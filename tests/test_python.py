@@ -16,9 +16,10 @@ from http.server import ThreadingHTTPServer
 
 from board_review import ReviewService
 from board_storage import BoardStorage, atomic_write, dumps, empty_snapshot, write_json
-from build import build
+from build import FILES, build
 from ipad_server import Bridge
 from load_session import load_session
+from pairing import Pairing
 from server import BoardApp, Handler
 
 
@@ -51,6 +52,7 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(list(target.parent.glob('.board.json-*')), [])
 
     def test_review_identity_matches_existing_javascript_receipts(self):
+        write_json(self.root / 'data/config.json', {'review': {'controller': 'unused', 'courses': {'Calc 3': 'unused'}}})
         service = ReviewService(self.storage)
         image = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII='
         check = service.archive('Test page', image, 'default', {'top': 0, 'height': 200})
@@ -76,10 +78,10 @@ class StorageTests(unittest.TestCase):
 
     def test_python_build_preserves_frontend_exactly(self):
         (self.root / 'src').mkdir()
-        for name in ('app.js', 'model.js', 'style.css', 'index.html'):
+        for name in FILES:
             (self.root / 'src' / name).write_text('fixture ' + name)
         build(self.root)
-        for name in ('app.js', 'model.js', 'style.css', 'index.html'):
+        for name in FILES:
             self.assertEqual((self.root / 'dist/native' / name).read_bytes(), (self.root / 'src' / name).read_bytes())
         self.assertEqual((self.root / 'dist/index.html').read_bytes(), (self.root / 'src/index.html').read_bytes())
 
@@ -92,9 +94,10 @@ class LiveProtocolTests(unittest.TestCase):
         self.board = ThreadingHTTPServer(('127.0.0.1', 0), Handler); self.board.daemon_threads = True; self.board.app = self.app
         self.app.port = self.board.server_port
         self.bridge = ThreadingHTTPServer(('127.0.0.1', 0), Bridge); self.bridge.daemon_threads = True
-        self.bridge.authority = f'127.0.0.1:{self.bridge.server_port}'; self.bridge.origin = 'http://' + self.bridge.authority
-        self.bridge.upstream = self.board.server_port; self.bridge.token = 'test-pairing'
-        self.streams = []
+        self.bridge.authorities = {f'127.0.0.1:{self.bridge.server_port}'}
+        self.bridge.upstream = self.board.server_port; self.bridge.pairing = Pairing(self.root / 'data')
+        self.cookie = 'board_ipad=' + self.bridge.pairing.redeem(self.bridge.pairing.invite(), 'test device')
+        self.streams = []; self.rev = None
         for server in (self.board, self.bridge):
             threading.Thread(target=server.serve_forever, daemon=True).start()
 
@@ -108,16 +111,17 @@ class LiveProtocolTests(unittest.TestCase):
     def request(self, path, body=None, bridge=False, headers=None):
         server = self.bridge if bridge else self.board
         conn = http.client.HTTPConnection('127.0.0.1', server.server_port, timeout=10)
-        actual = {'Cookie': 'board_ipad=test-pairing'} if bridge else {}
+        actual = {'Content-Type': 'application/json', **({'Cookie': self.cookie} if bridge else {})}
         actual.update(headers or {})
         conn.request('POST' if body is not None else 'GET', path, dumps(body).encode() if body is not None else None, actual)
         response = conn.getresponse(); status = response.status; data = response.read(); conn.close()
+        self.rev = response.getheader('X-Board-Rev') or self.rev
         return status, data
 
     def stream(self, tab, bridge=False):
         server = self.bridge if bridge else self.board
         conn = http.client.HTTPConnection('127.0.0.1', server.server_port, timeout=10)
-        conn.request('GET', '/api/events?tab=' + tab, headers={'Cookie': 'board_ipad=test-pairing'} if bridge else {})
+        conn.request('GET', '/api/events?tab=' + tab, headers={'Cookie': self.cookie} if bridge else {})
         response = conn.getresponse()
         self.assertEqual(response.status, 200)
         self.assertEqual(response.readline(), b': connected\n')
@@ -128,28 +132,33 @@ class LiveProtocolTests(unittest.TestCase):
     def test_ipad_large_save_and_live_operation_roundtrip(self):
         _, stream = self.stream('ipad-test', bridge=True)
         snapshot = empty_snapshot('Fixture')
-        snapshot['store']['asset:large'] = {'id': 'asset:large', 'typeName': 'asset', 'props': {'src': 'a' * (2 * 1024 * 1024)}}
-        status, _ = self.request('/api/board', {'tab': 'ipad-test', 'snapshot': snapshot, 'summary': {'shapeCount': 0}}, bridge=True)
+        from test_reliability import PNG
+        snapshot['store']['asset:large'] = {'id': 'asset:large', 'typeName': 'asset', 'type': 'image', 'props': {'src': PNG}, 'meta': {'synthetic_padding': 'a' * (2 * 1024 * 1024)}}
+        self.request('/api/board', bridge=True)  # learn the current revision, as a real tab does on load
+        status, _ = self.request('/api/board', {'tab': 'ipad-test', 'base': self.rev, 'snapshot': snapshot, 'summary': {'shapeCount': 0}}, bridge=True)
         self.assertEqual(status, 200)
         status, body = self.request('/api/board', bridge=True)
         self.assertEqual(json.loads(body), snapshot)
         with ThreadPoolExecutor() as pool:
-            pending = pool.submit(self.request, self.app.mcp_path, {'jsonrpc': '2.0', 'id': 1, 'method': 'tools/call', 'params': {'name': 'add_shapes', 'arguments': {'shapes': []}}})
+            pending = pool.submit(self.request, self.app.mcp_path, {'jsonrpc': '2.0', 'id': 1, 'method': 'tools/call', 'params': {'name': 'read_board', 'arguments': {'overview': True}}})
             message = json.loads(stream.readline()[6:]); stream.readline()
-            self.assertEqual(message['op'], 'add')
+            self.assertEqual(message['op'], 'export')
             self.assertEqual(self.request('/api/ack', {'opId': message['opId'], 'ok': True, 'ids': ['fixture']}, bridge=True)[0], 200)
             status, body = pending.result(timeout=5)
             result = json.loads(body)['result']
-            self.assertEqual(json.loads(result['content'][0]['text'])['done'], ['fixture'])
+            self.assertEqual(json.loads(result['content'][-1]['text'])['target']['notebook'], 'default')
 
     def test_incremental_ink_save_preserves_pdf_and_rejects_invalid_edits(self):
         snapshot = empty_snapshot('Fixture')
-        snapshot['store']['asset:pdf'] = {'id': 'asset:pdf', 'typeName': 'asset', 'props': {'src': 'x' * 100000}}
-        status, _ = self.request('/api/board', {'tab': 'test', 'snapshot': snapshot, 'summary': {'shapeCount': 0}})
+        from test_reliability import PNG
+        snapshot['store']['asset:pdf'] = {'id': 'asset:pdf', 'typeName': 'asset', 'type': 'image', 'props': {'src': PNG}, 'meta': {'synthetic_padding': 'x' * 100000}}
+        self.request('/api/board')
+        status, _ = self.request('/api/board', {'tab': 'test', 'base': self.rev, 'snapshot': snapshot, 'summary': {'shapeCount': 0}})
         self.assertEqual(status, 200)
         def save(changes):
-            return self.request('/api/board', {'tab': 'test', 'changes': changes, 'summary': {'shapeCount': 1}}, bridge=True)[0]
-        ink = {'id': 'shape:ink', 'typeName': 'shape', 'type': 'draw', 'props': {'segments': []}}
+            base = self.app.storage.revision('default')
+            return self.request('/api/board', {'tab': 'test', 'base': base, 'changes': changes, 'summary': {'shapeCount': 1}}, bridge=True)[0]
+        ink = {'id': 'shape:ink', 'typeName': 'shape', 'type': 'draw', 'parentId': 'page:page', 'props': {'segments': []}}
         other = {**ink, 'id': 'shape:other'}
         self.assertEqual(save({'put': [ink], 'remove': []}), 200)
         self.assertEqual(save({'put': [other], 'remove': []}), 200)

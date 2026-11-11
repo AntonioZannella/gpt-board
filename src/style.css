@@ -1,33 +1,545 @@
-*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none;font:14px -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:#eff3fa;background:#eef1f5}body{display:flex;flex-direction:column}header,nav,#tools{display:flex;align-items:center;gap:8px;flex-shrink:0;padding:8px 16px}header{height:58px;background:#304362}nav{height:42px;background:#26374e}#tools{height:56px;background:#34363c;overflow-x:auto;white-space:nowrap}button,select{font:inherit;border:1px solid transparent;border-radius:7px;background:transparent;color:inherit;padding:8px;min-height:34px;cursor:pointer;touch-action:manipulation;flex-shrink:0}button:hover{background:#ffffff1a}button:focus-visible,select:focus-visible{outline:2px solid #69bfff}button[aria-pressed=true]{color:#72c0ff;background:#ffffff15}button:disabled{opacity:.35;cursor:default}select{background:#ffffff10;max-width:360px}option{background:#fff;color:#222}#pages{max-width:380px;min-width:100px}.brand{font-weight:650;letter-spacing:1px;margin-right:12px}.brand small{display:block;font-size:9px;opacity:.7;letter-spacing:.6px}#books{max-width:390px}.spacer{flex:1}label{display:flex;gap:6px;align-items:center}input[type=color]{width:30px;height:30px;border:0;padding:0;background:none}main{position:relative;flex:1;min-height:0;overflow:hidden}canvas{display:block;width:100%;height:100%;touch-action:none;outline:none}footer{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);background:#e5f4e9;color:#214f32;padding:4px 10px;border-radius:12px;font-size:11px;pointer-events:none}#delete{color:#ffb7bd}#zoom{min-width:42px;text-align:center}@media(max-width:900px){.brand small{display:none}.brand{font-size:11px}header,nav,#tools{padding-left:8px;padding-right:8px}#books{max-width:45vw}#pages{max-width:45vw}header button{font-size:12px}#tools{gap:3px}}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  font:
+    14px -apple-system,
+    BlinkMacSystemFont,
+    system-ui,
+    sans-serif;
+  color: #eff3fa;
+  background: #eef1f5;
+}
+body {
+  display: flex;
+  flex-direction: column;
+}
+header,
+nav,
+#tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 8px 16px;
+}
+header {
+  height: 58px;
+  background: #304362;
+}
+nav {
+  height: 42px;
+  background: #26374e;
+}
+#tools {
+  height: 56px;
+  background: #34363c;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+button,
+select {
+  font: inherit;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  padding: 8px;
+  min-height: 34px;
+  cursor: pointer;
+  touch-action: manipulation;
+  flex-shrink: 0;
+}
+button:hover {
+  background: #ffffff1a;
+}
+button:focus-visible,
+select:focus-visible {
+  outline: 2px solid #69bfff;
+}
+button[aria-pressed='true'] {
+  color: #72c0ff;
+  background: #ffffff15;
+}
+button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+select {
+  background: #ffffff10;
+  max-width: 360px;
+}
+option {
+  background: #fff;
+  color: #222;
+}
+#pages {
+  max-width: 380px;
+  min-width: 100px;
+  flex: 1 1 100px;
+}
+.brand {
+  font-weight: 650;
+  letter-spacing: 1px;
+  margin-right: 12px;
+}
+.brand small {
+  display: block;
+  font-size: 9px;
+  opacity: 0.7;
+  letter-spacing: 0.6px;
+}
+#books {
+  max-width: 390px;
+}
+.spacer {
+  flex: 1;
+}
+label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+input[type='color'] {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  padding: 0;
+  background: none;
+}
+main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  outline: none;
+}
+footer {
+  position: fixed;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #e5f4e9;
+  color: #214f32;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  pointer-events: none;
+}
+#delete {
+  color: #ffb7bd;
+}
+#zoom {
+  min-width: 42px;
+  text-align: center;
+}
+@media (max-width: 900px) {
+  .brand small {
+    display: none;
+  }
+  .brand {
+    font-size: 11px;
+  }
+  header,
+  nav,
+  #tools {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  #books {
+    max-width: 45vw;
+  }
+  #pages {
+    max-width: 45vw;
+  }
+  header button {
+    font-size: 12px;
+  }
+  #tools {
+    gap: 3px;
+  }
+}
 
-[hidden]{display:none!important}header{height:auto;min-height:58px;flex-wrap:wrap}.sections{display:flex;gap:3px;padding:3px;background:#1e3049;border-radius:9px}.sections button[aria-pressed=true]{background:#eaf3ff;color:#203a59}#page-controls{display:flex;align-items:center;gap:8px}#board-hint{font-size:12px;color:#c4d3e7}#empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#26374e;padding:24px}#empty h1{font-size:28px;margin:0 0 8px}#empty p{max-width:400px;line-height:1.6;color:#617087}#firstboard,#confirm-create{background:#285f9f;color:white;padding:10px 16px}dialog{border:1px solid #d9e1eb;border-radius:16px;padding:24px;width:min(420px,90vw);color:#26374e;box-shadow:0 16px 80px #17283d30}dialog::backdrop{background:#16243c66}dialog h2{margin:0 0 22px}dialog input{width:100%;font:inherit;border:1px solid #bccadb;border-radius:8px;padding:12px;margin-top:8px}dialog label{font-weight:600}.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}#create-error{color:#a02b38;font-size:13px}#books{flex:1;min-width:100px;max-width:360px}@media(max-width:650px){.brand{margin-right:0}.sections{margin-left:auto}#books{max-width:none;flex-basis:50%}header .spacer{display:none}#board-hint{max-width:40vw;font-size:10px}}
+[hidden] {
+  display: none !important;
+}
+header {
+  height: auto;
+  min-height: 58px;
+  flex-wrap: wrap;
+}
+.sections {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: #1e3049;
+  border-radius: 9px;
+}
+.sections button[aria-pressed='true'] {
+  background: #eaf3ff;
+  color: #203a59;
+}
+#page-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 360px;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+}
+/* Long page titles yield space to the counter; narrow layouts grow by rows. */
+#count {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+#page-nav {
+  height: auto;
+  min-height: 42px;
+  flex-wrap: wrap;
+}
+#board-hint {
+  font-size: 12px;
+  color: #c4d3e7;
+}
+#empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #26374e;
+  padding: 24px;
+}
+#empty h1 {
+  font-size: 28px;
+  margin: 0 0 8px;
+}
+#empty p {
+  max-width: 400px;
+  line-height: 1.6;
+  color: #617087;
+}
+#firstboard,
+#confirm-create {
+  background: #285f9f;
+  color: white;
+  padding: 10px 16px;
+}
+dialog {
+  border: 1px solid #d9e1eb;
+  border-radius: 16px;
+  padding: 24px;
+  width: min(420px, 90vw);
+  color: #26374e;
+  box-shadow: 0 16px 80px #17283d30;
+}
+dialog::backdrop {
+  background: #16243c66;
+}
+dialog h2 {
+  margin: 0 0 22px;
+}
+dialog input {
+  width: 100%;
+  font: inherit;
+  border: 1px solid #bccadb;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+}
+dialog label {
+  font-weight: 600;
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+#create-error {
+  color: #a02b38;
+  font-size: 13px;
+}
+#books {
+  flex: 1;
+  min-width: 100px;
+  max-width: 360px;
+}
+@media (max-width: 650px) {
+  .brand {
+    margin-right: 0;
+  }
+  .sections {
+    margin-left: auto;
+  }
+  #books {
+    max-width: none;
+    flex-basis: 50%;
+  }
+  header .spacer {
+    display: none;
+  }
+  #board-hint {
+    max-width: 40vw;
+    font-size: 10px;
+  }
+}
 
 /* Keep the navigation toggle reachable even when the drawing tools scroll. */
-body.menus-minimized #app-header,body.menus-minimized #page-nav{display:none}
-#tools{overflow:hidden;gap:8px;padding-top:4px;padding-bottom:4px}
-#toggle-menus{flex:0 0 auto;background:#454a55;border:1px solid #626a78;min-height:40px;font-size:12px}
-.tool-items{display:flex;align-items:center;gap:8px;overflow-x:auto;min-width:0;flex:1;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
-.tool-items>*{flex-shrink:0}.tool-items button,.tool-items select{min-height:40px}
-@media(max-width:900px){.tool-items{gap:4px}#tools{gap:6px}}
+body.menus-minimized #app-header,
+body.menus-minimized #page-nav {
+  display: none;
+}
+#tools {
+  overflow: hidden;
+  gap: 8px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+#toggle-menus {
+  flex: 0 0 auto;
+  background: #454a55;
+  border: 1px solid #626a78;
+  min-height: 40px;
+  font-size: 12px;
+}
+.tool-items {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  min-width: 0;
+  flex: 1;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.tool-items > * {
+  flex-shrink: 0;
+}
+.tool-items button,
+.tool-items select {
+  min-height: 40px;
+}
+@media (max-width: 900px) {
+  .tool-items {
+    gap: 4px;
+  }
+  #tools {
+    gap: 6px;
+  }
+}
 
 /* Live ink is independent of the PDF/page layer. */
-#ink-canvas{position:absolute;inset:0;pointer-events:none}main,canvas{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#ink-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+main,
+canvas {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
 
 /* Safari must never turn writing into a selection of status/toolbar text. */
-html,body,header,nav,#tools,footer,button,label,select{
- user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+html,
+body,
+header,
+nav,
+#tools,
+footer,
+button,
+label,
+select {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
-input,textarea{user-select:text;-webkit-user-select:text}
-main{touch-action:none}
-#status{user-select:none;-webkit-user-select:none;pointer-events:none}
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}
+main {
+  touch-action: none;
+}
+#status {
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
+}
 
-#page-indicator{position:absolute;bottom:32px;left:50%;transform:translateX(-50%);font-size:11px;padding:4px 9px;border-radius:9px;background:#e9edf3e8;color:#39485c;pointer-events:none;white-space:nowrap;user-select:none;-webkit-user-select:none}
-#page-indicator:empty{display:none}
+#page-indicator {
+  position: absolute;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  padding: 4px 9px;
+  border-radius: 9px;
+  background: #e9edf3e8;
+  color: #39485c;
+  pointer-events: none;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#page-indicator:empty {
+  display: none;
+}
 
 /* Adjacent sheets slide together; this layer never receives Pencil contacts. */
-.page-motion{position:absolute;inset:0;pointer-events:none;z-index:2;will-change:transform}
+.page-motion {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  will-change: transform;
+}
 
-main{background:#cbd2dc}
+main {
+  background: #cbd2dc;
+}
 
 /* Match the eraser's screen-space radius without intercepting pen input. */
-#eraser-cursor{position:absolute;z-index:4;pointer-events:none;transform:translate(-50%,-50%);border:1.5px solid #26374e;border-radius:50%;box-shadow:0 0 0 1px #fff;background:#ffffff18;user-select:none;-webkit-user-select:none}
+#eraser-cursor {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  border: 1.5px solid #26374e;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #fff;
+  background: #ffffff18;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Connect iPad dialog */
+#connect-dialog code,
+#connect-dialog strong {
+  display: block;
+  margin: 6px 0 6px 18px;
+  font-size: 18px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+#connect-dialog strong {
+  font-size: 30px;
+  letter-spacing: 4px;
+}
+#connect-dialog h3 {
+  margin: 18px 0 6px;
+  font-size: 14px;
+}
+#connect-devices {
+  padding-left: 18px;
+  margin: 0;
+  font-size: 13px;
+}
+#connect-dialog button {
+  color: #285f9f;
+  border-color: #bccadb;
+}
+/* The status line can now carry a longer message. */
+footer {
+  max-width: 92vw;
+  text-align: center;
+}
+
+/* Dialogs preserve visible keyboard focus and usable touch targets. */
+button,
+select {
+  min-height: 40px;
+}
+:focus-visible {
+  outline: 3px solid #175ca8;
+  outline-offset: 3px;
+}
+#manage-dialog {
+  width: min(760px, 88vw);
+  max-height: 82vh;
+}
+#manage-body {
+  overflow-wrap: anywhere;
+}
+#manage-body input[type='search'],
+#manage-body textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 10px;
+}
+#manage-body pre {
+  white-space: pre-wrap;
+  max-height: 240px;
+  overflow: auto;
+  font-size: 13px;
+}
+.manage-row {
+  border-top: 1px solid #b7c2d1;
+  padding: 12px 0;
+}
+.manage-row button,
+#manage-body > button {
+  margin: 5px;
+}
+.manage-row code {
+  display: block;
+  font-size: 12px;
+}
+#manage-body label {
+  display: block;
+  margin: 12px 0;
+}
+#app-header,
+#page-nav {
+  flex-wrap: wrap;
+}
+
+/* Main navigation stays one row; secondary actions live in More. */
+#app-header {flex-wrap:nowrap; min-height:48px; padding:4px 8px; gap:6px;}
+#app-header .brand {font-size:11px; margin-right:0;}
+#app-header .brand small {display:none;}
+#app-header #books {min-width:60px; max-width:none; width:0; flex:1;}
+#page-controls {flex-wrap:nowrap; flex:1 1 210px; gap:3px;}
+#pages {min-width:65px; width:0; max-width:360px;}
+#page-nav {padding:3px 8px; gap:3px; min-height:44px;}
+#page-nav > .spacer {display:none;}
+#tools {height:50px;}
+.action-list {display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;}
+.action-list button {background:#edf2f8; color:#26374e;}
+#manage-body input[type=checkbox] {width:auto;}
+#manage-body select {background:#edf2f8; color:#26374e; max-width:100%;}
+@media (max-width:650px) {
+  #app-header .brand {display:none;}
+  #app-header .sections {margin:0;}
+  #app-header .sections button {padding:6px;}
+  #app-header #books {flex-basis:0;}
+}
+
+#ink-picker {display:inline-flex; align-items:center; gap:8px;}
+#ink-swatch {width:24px; height:24px; border:1px solid #94a3b8; border-radius:50%; background:#171923;}
+#ink-dialog {width:min(430px, calc(100vw - 40px)); box-sizing:border-box; max-height:85vh; overflow:auto;}
+#ink-colors {display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-bottom:18px;}
+#ink-colors button {min-height:52px; display:flex; align-items:center; gap:8px; padding:8px; color:#172033; background:#edf2f8; border:2px solid transparent;}
+#ink-colors button[aria-pressed="true"] {border-color:#2563eb;}
+#ink-colors button span {width:22px; height:22px; flex-shrink:0; border:1px solid #94a3b8; border-radius:50%;}
+#ink-custom-form {display:flex; flex-wrap:wrap; gap:8px; align-items:center;}
+#ink-custom {width:115px; min-height:44px; font:inherit;}
+#ink-error {color:#a02b38;}

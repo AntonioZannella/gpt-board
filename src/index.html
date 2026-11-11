@@ -1,1 +1,128 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GPT Board</title><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="GPT Board"><meta name="apple-mobile-web-app-status-bar-style" content="default"><link rel="stylesheet" href="/native/style.css"></head><body><header id="app-header"><span class="brand">GPT BOARD <small>Your space to think</small></span><div class="sections" aria-label="Board collections"><button id="notebooks" aria-pressed="true">Notebooks</button><button id="whiteboards" aria-pressed="false">Whiteboards</button></div><select id="books" aria-label="Notebook"></select><button id="newbook" aria-label="Create notebook">＋ New</button><span class="spacer"></span></header><nav id="page-nav"><span id="page-controls"><button id="prev" aria-label="Previous page">‹</button><select id="pages" aria-label="Page"></select><button id="next" aria-label="Next page">›</button><span id="count"></span></span><span id="board-hint" hidden>Infinite canvas · Drag with a finger to move</span><span class="spacer"></span><button id="minus" aria-label="Zoom out">−</button><span id="zoom">100%</span><button id="plus" aria-label="Zoom in">＋</button><button id="home" hidden>Reset view</button><button id="fit">Fit width</button></nav><section id="tools" role="toolbar" aria-label="Writing tools"><button id="toggle-menus" aria-expanded="true" aria-controls="app-header page-nav" title="Hide navigation to make more room for drawing">↑ Minimize</button><div class="tool-items"><button data-tool="pen" aria-pressed="true">✎ Pen</button><button data-tool="eraser">Eraser</button><label>Ink <input id="color" type="color" value="#171923"></label><label>Width <select id="width"><option value="2">Fine</option><option value="4">Medium</option><option value="7">Thick</option></select></label><button id="undo">↶ Undo</button><button id="redo">↷ Redo</button><button data-tool="highlight">Highlighter</button><button data-tool="select">Select</button><button data-tool="hand">Move page</button><button id="delete" disabled>Delete selected</button><label>Eraser <select id="eraseMode"><option value="stroke">Whole stroke</option><option value="partial">Part of stroke</option></select></label></div></section><main><canvas id="canvas" aria-label="Notebook drawing canvas" tabindex="0"></canvas><canvas id="ink-canvas" aria-hidden="true"></canvas><div id="page-indicator" aria-live="polite"></div><div id="empty" hidden><h1>Your whiteboards</h1><p>A big, open canvas for ideas, sketches, and working things out.</p><button id="firstboard">＋ Create whiteboard</button></div></main><dialog id="create-dialog"><form id="create-form"><h2 id="create-title">New whiteboard</h2><label for="board-name">Name</label><input id="board-name" maxlength="80" required autocomplete="off" placeholder="e.g. Ideas & sketches"><p id="create-error" role="alert"></p><div class="dialog-actions"><button type="button" id="cancel-create">Cancel</button><button type="submit" id="confirm-create">Create</button></div></form></dialog><footer id="status" role="status">Opening notebook…</footer><script type="module" src="/native/app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>GPT Board</title>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="GPT Board" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="stylesheet" href="/native/style.css" />
+  </head>
+  <body>
+    <header id="app-header">
+      <span class="brand">GPT BOARD <small>Your space to think</small></span>
+      <div class="sections" aria-label="Board collections">
+        <button id="notebooks" aria-pressed="true">Notebooks</button
+        ><button id="whiteboards" aria-pressed="false">Whiteboards</button>
+      </div>
+      <select id="books" aria-label="Notebook"></select
+      ><button id="newbook" aria-label="Create notebook">＋ New</button><span class="spacer"></span
+      ><button id="library">Library</button><button id="ai-panel">AI</button
+      ><button id="files">Files</button><button id="recovery">Recovery / Help</button
+      ><button id="connect" hidden>Connect iPad</button>
+    </header>
+    <nav id="page-nav">
+      <span id="page-controls"
+        ><button id="prev" aria-label="Previous page">‹</button
+        ><select id="pages" aria-label="Page"></select
+        ><button id="next" aria-label="Next page">›</button><span id="count"></span
+        ><button id="addpage" aria-label="Add a blank page">＋ Page</button
+        ><button id="manage-pages">Manage pages</button></span
+      ><span id="board-hint" hidden>Infinite canvas · Drag with a finger to move</span
+      ><span class="spacer"></span><button id="minus" aria-label="Zoom out">−</button
+      ><span id="zoom">100%</span><button id="plus" aria-label="Zoom in">＋</button
+      ><button id="home" hidden>Reset view</button><button id="fit">Fit width</button
+      ><button id="download" aria-label="Save this page as a PNG image">Save PNG</button>
+    </nav>
+    <section id="tools" role="toolbar" aria-label="Writing tools">
+      <button
+        id="toggle-menus"
+        aria-expanded="true"
+        aria-controls="app-header page-nav"
+        title="Hide navigation to make more room for drawing"
+      >
+        ↑ Minimize
+      </button>
+      <div class="tool-items">
+        <button data-tool="pen" aria-pressed="true">✎ Pen</button
+        ><button data-tool="eraser">Eraser</button
+        ><input id="color" type="hidden" value="#171923" /><button id="ink-picker" aria-haspopup="dialog" aria-controls="ink-dialog">Ink <span id="ink-swatch" aria-hidden="true"></span></button
+        ><label
+          >Width
+          <select id="width">
+            <option value="2">Fine</option>
+            <option value="4">Medium</option>
+            <option value="7">Thick</option>
+          </select></label
+        ><label><input id="show-annotations" type="checkbox" checked /> Show AI notes</label
+        ><button id="undo">↶ Undo</button><button id="redo">↷ Redo</button
+        ><button data-tool="highlight">Highlighter</button><button data-tool="select">Select</button
+        ><button data-tool="hand">Move page</button
+        ><button id="delete" disabled>Delete selected</button
+        ><label
+          >Eraser
+          <select id="eraseMode">
+            <option value="stroke">Whole stroke</option>
+            <option value="partial">Part of stroke</option>
+          </select></label
+        >
+      </div>
+    </section>
+    <main>
+      <canvas id="canvas" aria-label="Notebook drawing canvas" tabindex="0"></canvas
+      ><canvas id="ink-canvas" aria-hidden="true"></canvas>
+      <div id="page-indicator" aria-live="polite"></div>
+      <div id="empty" hidden>
+        <h1>Your whiteboards</h1>
+        <p>A big, open canvas for ideas, sketches, and working things out.</p>
+        <button id="firstboard">＋ Create whiteboard</button>
+      </div>
+    </main>
+    <dialog id="ink-dialog" aria-labelledby="ink-title">
+      <h2 id="ink-title">Ink color</h2>
+      <div id="ink-colors" aria-label="Ink colors"></div>
+      <form id="ink-custom-form">
+        <label for="ink-custom">Custom hex color</label>
+        <input id="ink-custom" type="text" value="#171923" maxlength="7"
+          pattern="#?[0-9a-fA-F]{6}" spellcheck="false" autocapitalize="off" autocomplete="off" />
+        <button id="ink-apply" type="button">Use color</button>
+      </form>
+      <p id="ink-error" role="status"></p>
+      <button id="ink-done" type="button">Done</button>
+    </dialog>
+    <dialog id="create-dialog">
+      <form id="create-form">
+        <h2 id="create-title">New whiteboard</h2>
+        <label for="board-name">Name</label
+        ><input
+          id="board-name"
+          maxlength="80"
+          required
+          autocomplete="off"
+          placeholder="e.g. Ideas & sketches"
+        />
+        <p id="create-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button type="button" id="cancel-create">Cancel</button
+          ><button type="submit" id="confirm-create">Create</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="connect-dialog" aria-labelledby="connect-title">
+      <h2 id="connect-title">Connect iPad</h2>
+      <div id="connect-steps">Preparing a pairing code…</div>
+      <h3>Paired devices</h3>
+      <ul id="connect-devices"></ul>
+      <div class="dialog-actions"><button type="button" id="close-connect">Done</button></div>
+    </dialog>
+    <dialog id="manage-dialog" aria-labelledby="manage-title">
+      <h2 id="manage-title"></h2>
+      <div id="manage-body"></div>
+      <div class="dialog-actions"><button id="close-manage" type="button">Done</button></div>
+    </dialog>
+    <footer id="status" role="status">Opening notebook…</footer>
+    <script type="module" src="/native/app.js"></script>
+  </body>
+</html>

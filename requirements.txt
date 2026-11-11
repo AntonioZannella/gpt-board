@@ -1,0 +1,6 @@
+# Optional product media/QR features; core drawing still uses the standard library.
+Pillow==13.0.0
+pypdfium2==5.15.2
+reportlab==5.1.0
+segno==1.6.6
+pypdf==6.14.2

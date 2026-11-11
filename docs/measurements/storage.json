@@ -1,0 +1,68 @@
+{
+  "python": "3.12.0",
+  "platform": "macOS-26.5.1-arm64-arm-64bit",
+  "machine": "arm64",
+  "workloads": [
+    {
+      "strokes": 100,
+      "snapshot_bytes": 62123,
+      "whole_save": {
+        "median_ms": 5.16,
+        "max_ms": 8.75,
+        "samples": 5
+      },
+      "load_and_validate": {
+        "median_ms": 2.24,
+        "max_ms": 2.26,
+        "samples": 5
+      },
+      "one_stroke_save": {
+        "median_ms": 3.34,
+        "max_ms": 3.47,
+        "samples": 5
+      },
+      "one_stroke_payload_bytes": 619
+    },
+    {
+      "strokes": 1000,
+      "snapshot_bytes": 621824,
+      "whole_save": {
+        "median_ms": 46.89,
+        "max_ms": 47.22,
+        "samples": 5
+      },
+      "load_and_validate": {
+        "median_ms": 22.08,
+        "max_ms": 22.25,
+        "samples": 5
+      },
+      "one_stroke_save": {
+        "median_ms": 29.28,
+        "max_ms": 30.24,
+        "samples": 5
+      },
+      "one_stroke_payload_bytes": 619
+    },
+    {
+      "strokes": 10000,
+      "snapshot_bytes": 6245834,
+      "whole_save": {
+        "median_ms": 470.32,
+        "max_ms": 473.82,
+        "samples": 5
+      },
+      "load_and_validate": {
+        "median_ms": 233.04,
+        "max_ms": 233.71,
+        "samples": 5
+      },
+      "one_stroke_save": {
+        "median_ms": 297.06,
+        "max_ms": 300.3,
+        "samples": 5
+      },
+      "one_stroke_payload_bytes": 619
+    }
+  ],
+  "scope": "Synthetic local storage: 20 points/stroke. Five samples per operation. No baseline comparison, physical Pencil latency or performance-gain claim."
+}

@@ -1,4 +1,14 @@
-"""Archived board evidence and the canonical Math Learning System CLI bridge."""
+"""Archived board evidence and the canonical Math Learning System CLI bridge.
+
+Review logging is optional. It is on only when a controller and at least one
+course are configured, in data/config.json or the MLS_* environment variables:
+
+    {"review": {"controller": "/path/to/mls.py",
+                "python": "python3",
+                "courses": {"Course label": "/path/to/that/course/store"}}}
+
+Without that, drawing and the AI drawing tools work and record_review is not offered.
+"""
 import hashlib
 import json
 import logging
@@ -18,6 +28,7 @@ from board_storage import (
     atomic_write,
     decode_png,
     dumps,
+    read_json,
     stamp,
 )
 
@@ -28,18 +39,30 @@ log = logging.getLogger('gpt-board.review')
 class ReviewService:
     def __init__(self, storage):
         self.storage = storage
-        self.courses = json.loads(os.environ['MLS_COURSES_JSON']) if os.environ.get('MLS_COURSES_JSON') else {
-            'Calc 3': str(Path.home() / 'Downloads/Courses/Calc 3/tutor/mls')}
-        self.controller = os.environ.get('MLS_CONTROLLER', str(ROOT.parent / 'Math Learning System/mls.py'))
+        config = (read_json(storage.data / 'config.json') or {}).get('review') or {}
+        courses = json.loads(os.environ['MLS_COURSES_JSON']) if os.environ.get('MLS_COURSES_JSON') else config.get('courses')
+        self.courses = courses if isinstance(courses, dict) else {}
+        limit = config.get('max_evidence_bytes', 512 * 1024 * 1024)
+        self.max_evidence_bytes = limit if isinstance(limit, int) and limit > 0 else 512 * 1024 * 1024
+        self.controller = os.environ.get('MLS_CONTROLLER') or config.get('controller')
+        self.python = os.environ.get('MLS_PYTHON') or config.get('python') or 'python3'
+        self.enabled = bool(self.courses and self.controller)
         schema = json.loads((ROOT / 'mcp_schema.json').read_text())
-        self.instructions = schema['instructions']
-        self.tools = schema['tools']
-        review = next(t for t in self.tools if t['name'] == 'record_review')
-        review['description'] = review['description'].split('Configured courses: ')[0] + 'Configured courses: ' + ', '.join(self.courses)
-        review['inputSchema']['properties']['course']['enum'] = list(self.courses)
+        review = next(t for t in schema['tools'] if t['name'] == 'record_review')
         self.error_fields = review['inputSchema']['properties']['errors']['items']['required']
+        if self.enabled:
+            self.instructions = schema['instructions']
+            self.tools = schema['tools']
+            review['description'] = review['description'].split('Configured courses: ')[0] + 'Configured courses: ' + ', '.join(self.courses)
+            review['inputSchema']['properties']['course']['enum'] = list(self.courses)
+        else:
+            # No learning system configured: offer the board tools only.
+            self.instructions = ''
+            self.tools = [t for t in schema['tools'] if t is not review]
+            for tool in self.tools:
+                tool['description'] = tool['description'].split(' When checking answers')[0]
 
-    def archive(self, frame, png, notebook, region=None):
+    def archive(self, frame, png, notebook, region=None, frame_id=None, revision=None):
         when = stamp()
         check_id = 'check-' + str(uuid.uuid4())
         name = re.sub(r'[^\w.-]+', '_', frame, flags=re.ASCII) + '-' + re.sub(r'[:.]', '', when['ts'][11:23]) + '-' + check_id[-8:] + '.png'
@@ -49,12 +72,21 @@ class ReviewService:
                'file': str(path), 'sha256': hashlib.sha256(image).hexdigest()}
         if region:
             row['region'] = region
+        if frame_id:
+            row['frame_id'] = frame_id
+        if revision:
+            row['revision'] = revision
         with LOCK:
+            used = sum(p.stat().st_size for p in (self.storage.data / 'checks').rglob('*.png'))
+            if used + len(image) > self.max_evidence_bytes:
+                raise ClientError('Review image storage limit reached. Preserve/export the archive and deliberately increase review.max_evidence_bytes; no history was deleted.')
             atomic_write(path, image)
             append_json(self.storage.data / 'checks/index.jsonl', row)
         return row
 
     def payload(self, args):
+        if not self.enabled:
+            raise ClientError('Review logging is not configured on this board.')
         if not isinstance(args, dict):
             raise ClientError('Provide a structured review.')
         def nonempty(value):
@@ -104,6 +136,9 @@ class ReviewService:
                                 break
         if not check or not Path(check['file']).is_file():
             raise ClientError('Archived check image not found. Read the exact frame again before recording this review.')
+        # The review must point at the very image that was read.
+        if check.get('sha256') and hashlib.sha256(Path(check['file']).read_bytes()).hexdigest() != check['sha256']:
+            raise ClientError('The archived check image no longer matches its recorded fingerprint. Read the exact frame again before recording this review.')
         identity = [args[k] for k in ('check_id', 'course', 'section', 'page', 'problem')]
         result = {key: args[key] for key in ('course', 'section', 'page', 'problem', 'original_response', 'result', 'read_confidence', 'assistance', 'errors')}
         result['review_id'] = 'br-' + hashlib.sha256(dumps(identity).encode()).hexdigest()[:32]
@@ -111,13 +146,26 @@ class ReviewService:
         for key in ('resolves', 'supersedes'):
             if key in args:
                 result[key] = args[key]
+        if 'supersedes' in result:
+            link = result['supersedes']
+            if not isinstance(link, dict) or set(link) != {'review_id', 'reason'} or not all(nonempty(v) for v in link.values()):
+                raise ClientError('supersedes requires a review_id and a reason.')
+            if link['review_id'] == result['review_id']:
+                raise ClientError('A correction requires a fresh read and a new review ID.')
+        if 'resolves' in result:
+            links = result['resolves']
+            if result['result'] != 'right' or not isinstance(links, list) or not 1 <= len(links) <= 50:
+                raise ClientError('Only a right review may resolve prior errors (1–50 links).')
+            for link in links:
+                if not isinstance(link, dict) or set(link) != {'review_id', 'error_id', 'reason'} or not all(nonempty(v) for v in link.values()):
+                    raise ClientError('Each resolves link requires review_id, error_id and reason.')
         if len(dumps(result).encode()) > 256 * 1024:
             raise ClientError('Review is too large; record one problem at a time.')
         return result
 
     def record(self, args):
         payload = self.payload(args)
-        command = [os.environ.get('MLS_PYTHON', 'python3'), self.controller, '--dir', self.courses[payload['course']], 'board-review', '--file', '-']
+        command = [self.python, self.controller, '--dir', self.courses[payload['course']], 'board-review', '--file', '-']
         with REVIEW_LOCK, tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
             try:
                 child = subprocess.run(command, input=dumps(payload).encode(), stdout=out, stderr=err, timeout=30, check=False)
@@ -133,9 +181,16 @@ class ReviewService:
         if child.returncode:
             # The controller's own refusal ("Controller busy...", "superseded by...")
             # tells the AI what to do next; only its last line goes back, capped.
-            log.warning('Review controller exited %s: %s', child.returncode, (stderr or stdout).strip())
-            lines = (stderr or stdout).strip().splitlines()
-            detail = lines[-1][:300] if lines else f'controller exited {child.returncode}'
+            log.warning('Review controller exited %s; private output omitted.', child.returncode)
+            output = (stderr or stdout).lower()
+            if 'busy' in output:
+                detail = 'Controller busy: retry the identical review.'
+            elif 'superseded' in output:
+                detail = 'The linked review was superseded. Inspect canonical history and use its current review.'
+            elif 'conflict' in output or 'different payload' in output:
+                detail = 'Review identity conflicts with saved content. Use fresh evidence and supersedes for a correction.'
+            else:
+                detail = 'Controller refused or could not persist this review. Check the initialized course/error-log configuration and retry the identical review.'
             raise ClientError('Review was not confirmed saved: ' + detail)
         try:
             receipt = json.loads(stdout)
@@ -144,3 +199,36 @@ class ReviewService:
         except (ValueError, KeyError, TypeError) as exc:
             raise ClientError('Review controller returned no valid save confirmation. Retry the same review rather than claiming success.') from exc
         return receipt
+
+    def history(self, course, offset=0):
+        """Read canonical records directly, without running state/export commands
+        that can rebuild mastery projections. Never writes a course or log."""
+        if course not in self.courses:
+            raise ClientError('Choose a configured course.')
+        if not isinstance(offset, int) or offset < 0:
+            raise ClientError('Invalid history offset.')
+        rows = []
+        folder = Path(self.courses[course])
+        config = read_json(folder / 'course.json')
+        if not isinstance(config, dict) or config.get('course') != course:
+            raise ClientError('The course mapping does not point to a matching initialized course.')
+        path = folder / 'attempts.jsonl'
+        if path.exists():
+            with path.open(encoding='utf-8') as stream:
+                for line in stream:
+                    if len(line) > 512 * 1024:
+                        raise ClientError('A history record is oversized. Inspect it through the canonical learning system.')
+                    if not line.strip():
+                        continue
+                    try:
+                        row = json.loads(line)
+                    except ValueError:
+                        raise ClientError('Canonical history has an unreadable record. It was left untouched.') from None
+                    if row.get('kind') == 'board_review':
+                        # Evidence paths and unrelated session records are not
+                        # exposed by this board-only view.
+                        row = {k: v for k, v in row.items() if k != 'evidence'}
+                        rows.append(row)
+        return {'course': course, 'total': len(rows), 'offset': offset,
+                'reviews': list(reversed(rows))[offset:offset + 100],
+                'notice': 'Historical checks and correction links, not current work or mastery. Due practice stays in the canonical study workflow.'}

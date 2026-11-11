@@ -13,11 +13,11 @@ test('read_board saves the frame image; saves log only frames whose ink changed'
 	const root = new URL('../', import.meta.url)
 	const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 	await fs.copyFile(new URL('server.py', root), path.join(tmp, 'server.py'))
-	for(const support of ["board_storage.py", "board_review.py", "http_body.py", "mcp_schema.json"]) await fs.copyFile(new URL(support, root),path.join(tmp,support));
+	for(const support of ["board_storage.py", "board_review.py", "http_body.py", "pairing.py", "validation.py", "ai_operations.py", "file_lock.py", "http_limits.py", "media.py", "media_worker.py", "browser_snapshot.py", "mcp_schema.json"]) await fs.copyFile(new URL(support, root),path.join(tmp,support));
  await fs.writeFile(path.join(tmp, 'package.json'), '{"type":"module"}')
 	await fs.mkdir(path.join(tmp, 'dist'))
 	await fs.writeFile(path.join(tmp, 'dist/index.html'), '<p>Test board</p>')
-	const child = spawn(process.env.BOARD_PYTHON || 'python3', [path.join(tmp, 'server.py')], { env: { ...process.env, PORT: String(PORT) }, stdio: ['ignore', 'pipe', 'pipe'] })
+	const child = spawn(process.env.BOARD_PYTHON || 'python3', [path.join(tmp, 'server.py')], { env: { ...process.env, PORT: String(PORT), MLS_CONTROLLER: 'unused-in-this-test', MLS_COURSES_JSON: '{"Test":"unused"}' }, stdio: ['ignore', 'pipe', 'pipe'] })
 	const controller = new AbortController()
 	try {
 		let err = ''
@@ -26,9 +26,11 @@ test('read_board saves the frame image; saves log only frames whose ink changed'
 		const base = `http://127.0.0.1:${PORT}`
 		const post = (url, body) => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 		const frame = (id, name) => ({ id, type: 'frame', typeName: 'shape', parentId: 'page:page', props: { name } })
-		const draw = (id, parentId, pts) => ({ id, type: 'draw', typeName: 'shape', parentId, props: { segments: [{ points: pts }] } })
+		const draw = (id, parentId, pts) => ({ id, type: 'draw', typeName: 'shape', parentId, props: { segments: [{ points: pts.map(x=>({x,y:x,z:.5})) }] } })
 		const save = async (store) => {
-			const r = await post(base + '/api/board', { tab: 'one', snapshot: { store, schema: { schemaVersion: 2 } }, summary: { shapeCount: Object.keys(store).length } })
+			// A whole-notebook save must name the revision it replaces.
+			const rev = (await fetch(base + '/api/board')).headers.get('x-board-rev')
+			const r = await post(base + '/api/board', { tab: 'one', base: rev, snapshot: { store: {'page:page': {id:'page:page',typeName:'page',name:'Fixture'}, ...store}, schema: { schemaVersion: 2 } }, summary: { shapeCount: Object.keys(store).length } })
 			assert.equal(r.status, 200)
 		}
 		const activity = async () => (await fs.readFile(path.join(tmp, 'data/activity.jsonl'), 'utf8').catch(() => '')).trim().split('\n').filter(Boolean).map(JSON.parse)

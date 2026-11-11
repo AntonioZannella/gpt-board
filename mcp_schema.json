@@ -230,13 +230,13 @@
     {
       "name": "read_board",
       "title": "Read board",
-      "description": "Fresh handwriting image from the active notebook: pass an exact frame name. No frame lists frames without an image. overview:true explicitly reads the whole notebook for orientation. Details are opt-in; normally one read per check. When checking answers, follow the review instructions returned here and use record_review to persist the review and any confirmed errors.",
+      "description": "Fresh handwriting image for an answer check. With no arguments, captures the current connected iPad page in ONE call and returns its review_context/check_id. frame:'@ipad' explicitly requires that device. Do not list pages first for a current-page check. Use an exact frame for a different page, or list_frames:true to discover pages (also the fallback when no iPad is active). overview:true is for orientation only. Keep include_details off unless needed. When checking answers, inspect the fresh image and use record_review for each checked problem, preserving evidence identity and uncertainty. Never reuse an old image for a new check.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "frame": {
             "type": "string",
-            "description": "Exact problem frame name."
+            "description": "Exact frame name or ID, or '@ipad' for the current iPad page. Omit for the automatic current-iPad read."
           },
           "overview": {
             "type": "boolean",
@@ -264,6 +264,14 @@
               "height"
             ],
             "description": "Optional full-width slice of an exact frame, in frame-relative pixels. Use legible slices to check long pages."
+          },
+          "notebook": {
+            "type": "string",
+            "description": "Optional notebook ID. Default current-page reads prefer the connected iPad; an explicit different notebook is respected. Every result identifies its notebook in target.notebook."
+          },
+          "list_frames": {
+            "type": "boolean",
+            "description": "Explicitly list pages instead of automatically reading the current iPad page. Use only to locate a different page; do not combine with frame or overview."
           }
         }
       },
@@ -276,7 +284,7 @@
     {
       "name": "add_shapes",
       "title": "Add shapes",
-      "description": "Add shapes, text, sticky notes, or arrows to the board. Positions are page pixels; the user is usually working near the top-left. Omit x/y to auto-place.",
+      "description": "Apply a bounded AI annotation edit to an explicit notebook/page or the target selected in the board UI. Stable operation_id retries return the durable receipt without reapplying. Only AI-owned material may be changed automatically. Student material requires inspecting and approving the exact proposal in the board AI panel. No model-supplied authorization flag grants permission. Pages and imported images are always protected. Coordinates are page-relative; automatic placement seeks clear space within the page.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -301,7 +309,9 @@
                     "hexagon",
                     "text",
                     "note",
-                    "arrow"
+                    "arrow",
+                    "draw",
+                    "highlight"
                   ]
                 },
                 "x": {
@@ -357,13 +367,78 @@
                 "to": {
                   "type": "string",
                   "description": "Arrow only: id of the end shape."
+                },
+                "segments": {
+                  "type": "array",
+                  "description": "Editable freehand paths, not font glyphs. Each segment has type free and points [{x,y,z}], where z is pressure. Coordinates are relative to shape x/y.",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "free"
+                        ]
+                      },
+                      "points": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            },
+                            "z": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "points"
+                    ]
+                  }
                 }
               }
             }
+          },
+          "notebook": {
+            "type": "string",
+            "description": "Optional notebook ID. Omit to use the board tab used most recently. Every result reports the notebook it acted on in target.notebook; pass this to act on a different open notebook."
+          },
+          "operation_id": {
+            "type": "string",
+            "description": "Stable unique operation ID, 8\u2013100 letters/digits/_/-. Reuse on an identical retry, including after a lost response."
+          },
+          "frame": {
+            "type": "string",
+            "description": "Stable page ID. Coordinates are relative to this page. Use whiteboard for a board without pages."
+          },
+          "base_revision": {
+            "type": "string",
+            "description": "Optional revision returned by a recent read; stale revisions are refused."
+          },
+          "tab": {
+            "type": "string",
+            "description": "Optional exact tab ID. Disconnected or mismatched tabs are refused."
+          },
+          "preview": {
+            "type": "boolean",
+            "description": "Stage this exact edit for human approval in the AI panel before inserting it."
           }
         },
         "required": [
-          "shapes"
+          "shapes",
+          "operation_id"
         ]
       },
       "annotations": {
@@ -375,7 +450,7 @@
     {
       "name": "update_shapes",
       "title": "Update shapes",
-      "description": "Move, resize, recolor, or change the text of existing shapes by id. Only the fields you pass change.",
+      "description": "Apply a bounded AI annotation edit to an explicit notebook/page or the target selected in the board UI. Stable operation_id retries return the durable receipt without reapplying. Only AI-owned material may be changed automatically. Student material requires inspecting and approving the exact proposal in the board AI panel. No model-supplied authorization flag grants permission. Pages and imported images are always protected. ",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -400,7 +475,9 @@
                     "hexagon",
                     "text",
                     "note",
-                    "arrow"
+                    "arrow",
+                    "draw",
+                    "highlight"
                   ]
                 },
                 "x": {
@@ -456,16 +533,81 @@
                 "to": {
                   "type": "string",
                   "description": "Arrow only: id of the end shape."
+                },
+                "segments": {
+                  "type": "array",
+                  "description": "Editable freehand paths, not font glyphs. Each segment has type free and points [{x,y,z}], where z is pressure. Coordinates are relative to shape x/y.",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "free"
+                        ]
+                      },
+                      "points": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            },
+                            "z": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "points"
+                    ]
+                  }
                 }
               },
               "required": [
                 "id"
               ]
             }
+          },
+          "notebook": {
+            "type": "string",
+            "description": "Optional notebook ID. Omit to use the board tab used most recently. Every result reports the notebook it acted on in target.notebook; pass this to act on a different open notebook."
+          },
+          "operation_id": {
+            "type": "string",
+            "description": "Stable unique operation ID, 8\u2013100 letters/digits/_/-. Reuse on an identical retry, including after a lost response."
+          },
+          "frame": {
+            "type": "string",
+            "description": "Stable page ID. Coordinates are relative to this page. Use whiteboard for a board without pages."
+          },
+          "base_revision": {
+            "type": "string",
+            "description": "Optional revision returned by a recent read; stale revisions are refused."
+          },
+          "tab": {
+            "type": "string",
+            "description": "Optional exact tab ID. Disconnected or mismatched tabs are refused."
+          },
+          "preview": {
+            "type": "boolean",
+            "description": "Stage this exact edit for human approval in the AI panel before inserting it."
           }
         },
         "required": [
-          "shapes"
+          "shapes",
+          "operation_id"
         ]
       },
       "annotations": {
@@ -477,7 +619,7 @@
     {
       "name": "delete_shapes",
       "title": "Delete shapes",
-      "description": "Delete shapes by id. Only delete shapes you created unless the user asks.",
+      "description": "Apply a bounded AI annotation edit to an explicit notebook/page or the target selected in the board UI. Stable operation_id retries return the durable receipt without reapplying. Only AI-owned material may be changed automatically. Student material requires inspecting and approving the exact proposal in the board AI panel. No model-supplied authorization flag grants permission. Pages and imported images are always protected. ",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -486,10 +628,31 @@
             "items": {
               "type": "string"
             }
+          },
+          "notebook": {
+            "type": "string",
+            "description": "Optional notebook ID. Omit to use the board tab used most recently. Every result reports the notebook it acted on in target.notebook; pass this to act on a different open notebook."
+          },
+          "operation_id": {
+            "type": "string",
+            "description": "Stable unique operation ID, 8\u2013100 letters/digits/_/-. Reuse on an identical retry, including after a lost response."
+          },
+          "frame": {
+            "type": "string",
+            "description": "Stable page ID. Coordinates are relative to this page. Use whiteboard for a board without pages."
+          },
+          "base_revision": {
+            "type": "string",
+            "description": "Optional revision returned by a recent read; stale revisions are refused."
+          },
+          "tab": {
+            "type": "string",
+            "description": "Optional exact tab ID. Disconnected or mismatched tabs are refused."
           }
         },
         "required": [
-          "ids"
+          "ids",
+          "operation_id"
         ]
       },
       "annotations": {

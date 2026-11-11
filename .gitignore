@@ -34,3 +34,15 @@ Thumbs.db
 # Demo source recordings and previews (only the GIF is published)
 docs/demo/*.mov
 docs/demo/*-preview.png
+
+# Disposable browser and benchmark evidence
+/browser-artifacts/
+/benchmark-results.json
+/release/
+
+# Local development, device signing, and personal audit notes
+/work/
+**/xcuserdata/
+*.xcuserstate
+/ios/Signing.local.xcconfig
+/docs/CHANGE_AUDIT_2026-11-11.md

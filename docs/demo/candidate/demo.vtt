@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:00.345 --> 00:00:03.305
+GPT Board 1.3.0rc1 — original synthetic sample, disposable installation.
+
+00:00:03.305 --> 00:00:07.929
+Write locally, wait for Saved, then reopen the page.
+
+00:00:07.929 --> 00:00:10.988
+A new page retains stable identity. The next annotation uses the MCP API.
+
+00:00:10.988 --> 00:00:12.564
+The synthetic MCP client adds a page-relative note; its receipt makes retries safe.
+
+00:00:12.564 --> 00:00:13.857
+Inspect the saved before/after records and use Undo for a reversible AI edit.
+
+00:00:13.857 --> 00:00:17.064
+A real receipt in a temporary course: unresolved, help unknown. No personal learning record or mastery claim.
+
+00:00:17.064 --> 00:00:19.065
+Reload preserves writing and annotation. Physical iPad/Pencil validation is still required.

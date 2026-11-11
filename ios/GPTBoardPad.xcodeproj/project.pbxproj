@@ -1,0 +1,212 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* Assets.xcassets */; };
+		464F6A7CE2D613DEAE777730 /* PencilToggle.js in Resources */ = {isa = PBXBuildFile; fileRef = CB99B709A1978BD205AB9DFD /* PencilToggle.js */; };
+		8F16294D5447854D3ACC4C9E /* GPTBoardPadApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5DB37D63FD19A76B6EAB04D /* GPTBoardPadApp.swift */; };
+		ECCAC3B0696FC6ED8015B71A /* BoardConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60B27F004E454ACA81B04802 /* BoardConnection.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A20000000000000000000001 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = SOURCE_ROOT; };
+		A10000000000000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		38A007151ABE87CC01A5B6E9 /* GPTBoardPad.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = GPTBoardPad.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		60B27F004E454ACA81B04802 /* BoardConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardConnection.swift; sourceTree = "<group>"; };
+		CB99B709A1978BD205AB9DFD /* PencilToggle.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = PencilToggle.js; sourceTree = "<group>"; };
+		E5DB37D63FD19A76B6EAB04D /* GPTBoardPadApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GPTBoardPadApp.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		7561BFB015D8F536760CB671 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		64292B1C2B2E13EAD8788FC8 /* GPTBoardPad */ = {
+			isa = PBXGroup;
+			children = (
+				E5DB37D63FD19A76B6EAB04D /* GPTBoardPadApp.swift */,
+				60B27F004E454ACA81B04802 /* BoardConnection.swift */,
+				CB99B709A1978BD205AB9DFD /* PencilToggle.js */,
+				A10000000000000000000002 /* Assets.xcassets */,
+			);
+			path = GPTBoardPad;
+			sourceTree = "<group>";
+		};
+		B28B7AF69320201D1CF206EB = {
+			isa = PBXGroup;
+			children = (
+				64292B1C2B2E13EAD8788FC8 /* GPTBoardPad */,
+				FBDC4F23F93125BBEEAE800C /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		FBDC4F23F93125BBEEAE800C /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				38A007151ABE87CC01A5B6E9 /* GPTBoardPad.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		0E8A3AD980EC179856012B7E /* GPTBoardPad */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C57128001CE614BF8549D6BB /* Build configuration list for PBXNativeTarget "GPTBoardPad" */;
+			buildPhases = (
+				BCE16DD0260827ECF338C787 /* Sources */,
+				7561BFB015D8F536760CB671 /* Frameworks */,
+				0189424A5A60FED329FA868E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = GPTBoardPad;
+			productName = GPTBoardPad;
+			productReference = 38A007151ABE87CC01A5B6E9 /* GPTBoardPad.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		98F54143AB4E86B28C3AFEE0 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 2600;
+			};
+			buildConfigurationList = 862894B703A6DEDF96A9DD6C /* Build configuration list for PBXProject "GPTBoardPad" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = B28B7AF69320201D1CF206EB;
+			productRefGroup = FBDC4F23F93125BBEEAE800C /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				0E8A3AD980EC179856012B7E /* GPTBoardPad */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		0189424A5A60FED329FA868E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				464F6A7CE2D613DEAE777730 /* PencilToggle.js in Resources */,
+				A10000000000000000000001 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		BCE16DD0260827ECF338C787 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8F16294D5447854D3ACC4C9E /* GPTBoardPadApp.swift in Sources */,
+				ECCAC3B0696FC6ED8015B71A /* BoardConnection.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		01F561AC4AB15D6A23A57976 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		258A38BC256D3BE0936BEE7F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A20000000000000000000001 /* Signing.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "$(GPT_BOARD_DEVELOPMENT_TEAM)";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = GPTBoardPad/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.antoniozannella.gptboard;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Debug;
+		};
+		32FAAECAC742100F7753F0C1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		AF08645F33FB7E7450F93573 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A20000000000000000000001 /* Signing.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "$(GPT_BOARD_DEVELOPMENT_TEAM)";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = GPTBoardPad/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.antoniozannella.gptboard;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		862894B703A6DEDF96A9DD6C /* Build configuration list for PBXProject "GPTBoardPad" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				32FAAECAC742100F7753F0C1 /* Debug */,
+				01F561AC4AB15D6A23A57976 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C57128001CE614BF8549D6BB /* Build configuration list for PBXNativeTarget "GPTBoardPad" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				258A38BC256D3BE0936BEE7F /* Debug */,
+				AF08645F33FB7E7450F93573 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+}
